@@ -49,7 +49,7 @@ Para desarrollo sin conexión puede usar `DATABASE_URL=sqlite:///./saiu.db`.
 cd backend
 python -m venv .venv
 .venv\Scripts\activate          # Windows  (Linux/macOS: source .venv/bin/activate)
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # incluye pytest; en producción solo requirements.txt
 copy .env.example .env          # ponga su DATABASE_URL de Supabase y un JWT_SECRET propio
 python seed.py                  # crea las tablas y carga datos demo (--reset para recrear)
 fastapi dev app/main.py         # http://localhost:8000  ·  documentación: /docs
@@ -106,6 +106,20 @@ cerrada no admite cambios (el coordinador puede reabrirla).
 
 **Auditoría**: toda operación de escritura y cada inicio de sesión queda registrada con usuario, acción, entidad y
 detalle.
+
+## Despliegue en Vercel
+
+Un solo proyecto con **Vercel Services** (Beta), definido en `vercel.json`: `/api/*` va al backend FastAPI
+(`backend/app/main.py`) y todo lo demás al frontend Angular. Mismo dominio, sin CORS.
+
+1. Importe el repositorio en Vercel (**Add New → Project**), dejando la carpeta raíz del repositorio como *Root Directory*.
+2. En **Settings → Environment Variables** agregue:
+   - `DATABASE_URL`: cadena del **Transaction pooler** de Supabase (puerto `6543`) con prefijo `postgresql+psycopg://`
+     y `?sslmode=require`.
+   - `JWT_SECRET`: una clave distinta a la de desarrollo.
+3. Despliegue con un push a GitHub o con la CLI (`vercel` para preview, `vercel --prod` para producción).
+
+`.vercelignore` impide que la CLI suba `.env`, `.venv`, `node_modules` y las pruebas.
 
 ## API
 

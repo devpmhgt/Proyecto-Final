@@ -1,0 +1,10 @@
+# Nunca subir secretos ni artefactos locales al desplegar con la CLI
+**/.env
+backend/.venv/
+backend/tests/
+backend/*.db
+**/__pycache__/
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/

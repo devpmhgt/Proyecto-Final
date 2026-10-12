@@ -58,6 +58,7 @@ CREATE TABLE parametros_academicos (
 	descripcion TEXT, 
 	PRIMARY KEY (id)
 );
+CREATE UNIQUE INDEX ix_parametros_academicos_clave ON parametros_academicos (clave);
 
 CREATE TABLE periodos (
 	id SERIAL NOT NULL, 
@@ -81,6 +82,7 @@ CREATE TABLE usuarios (
 	creado_en TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL, 
 	PRIMARY KEY (id)
 );
+CREATE UNIQUE INDEX ix_usuarios_email ON usuarios (email);
 
 CREATE TABLE auditoria (
 	id SERIAL NOT NULL, 
@@ -93,6 +95,7 @@ CREATE TABLE auditoria (
 	PRIMARY KEY (id), 
 	FOREIGN KEY(usuario_id) REFERENCES usuarios (id)
 );
+CREATE INDEX ix_auditoria_fecha ON auditoria (fecha);
 
 CREATE TABLE docentes (
 	id SERIAL NOT NULL, 
@@ -110,6 +113,7 @@ CREATE TABLE docentes (
 	FOREIGN KEY(usuario_id) REFERENCES usuarios (id), 
 	UNIQUE (email)
 );
+CREATE UNIQUE INDEX ix_docentes_codigo ON docentes (codigo);
 
 CREATE TABLE notificaciones (
 	id SERIAL NOT NULL, 
@@ -121,6 +125,7 @@ CREATE TABLE notificaciones (
 	PRIMARY KEY (id), 
 	FOREIGN KEY(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
 );
+CREATE INDEX ix_notificaciones_usuario_id ON notificaciones (usuario_id);
 
 CREATE TABLE planes_estudio (
 	id SERIAL NOT NULL, 
@@ -172,6 +177,7 @@ CREATE TABLE estudiantes (
 	FOREIGN KEY(carrera_id) REFERENCES carreras (id), 
 	FOREIGN KEY(plan_id) REFERENCES planes_estudio (id)
 );
+CREATE UNIQUE INDEX ix_estudiantes_carnet ON estudiantes (carnet);
 
 CREATE TABLE plan_cursos (
 	id SERIAL NOT NULL, 
