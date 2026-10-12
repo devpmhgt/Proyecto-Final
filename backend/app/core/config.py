@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "SAIU - Sistema Académico Integral Universitario"
-    database_url: str = "mysql+pymysql://saiu:saiu_pass@localhost:3306/saiu?charset=utf8mb4"
+    database_url: str = "sqlite:///./saiu.db"
     jwt_secret: str = "dev-secret-cambiar"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 120

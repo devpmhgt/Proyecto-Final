@@ -6,7 +6,7 @@ Aplicación web para administrar los procesos académicos de una universidad: es
 |---|---|
 | Frontend | Angular 22 (componentes standalone, signals, formularios reactivos, lazy loading) |
 | Backend | Python + FastAPI + SQLAlchemy 2 |
-| Base de datos | MySQL 8 |
+| Base de datos | PostgreSQL en Supabase |
 | Seguridad | JWT (Bearer) + RBAC con 4 roles: `admin`, `coordinador`, `docente`, `estudiante` |
 
 ## Estructura
@@ -24,21 +24,24 @@ backend/
   seed.py        crea tablas y datos de demostración
   tests/         pruebas de flujo (pytest, SQLite)
 database/
-  schema.sql     esquema MySQL (20 tablas) generado desde los modelos
+  schema.sql     esquema PostgreSQL (20 tablas) generado desde los modelos (referencia)
 frontend/
   src/app/
     core/        modelos TS, ApiService, AuthService, interceptor JWT, guards
     layout/      shell con menú según rol
     pages/       una página por módulo
-docker-compose.yml   MySQL para desarrollo
 ```
 
 ## Puesta en marcha
 
-### 1. Base de datos MySQL
+### 1. Base de datos (Supabase)
 
-Con Docker: `docker compose up -d`, o en un MySQL local cree la base `saiu` y un usuario con permisos sobre ella
-(o ejecute `database/schema.sql`).
+1. En Supabase: **Project Settings → Database → Connection string → Session pooler** y copie la cadena.
+2. Copie `backend/.env.example` a `backend/.env` y pegue la cadena en `DATABASE_URL`, con el prefijo
+   `postgresql+psycopg://` y su contraseña. **`backend/.env` está en `.gitignore`: nunca se sube al repositorio.**
+3. `python seed.py` crea las tablas y activa RLS en todas, para que la API REST pública de Supabase no exponga los datos.
+
+Para desarrollo sin conexión puede usar `DATABASE_URL=sqlite:///./saiu.db`.
 
 ### 2. Backend
 
@@ -47,12 +50,12 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate          # Windows  (Linux/macOS: source .venv/bin/activate)
 pip install -r requirements.txt
-copy .env.example .env          # ajuste DATABASE_URL y JWT_SECRET
+copy .env.example .env          # ponga su DATABASE_URL de Supabase y un JWT_SECRET propio
 python seed.py                  # crea las tablas y carga datos demo (--reset para recrear)
 fastapi dev app/main.py         # http://localhost:8000  ·  documentación: /docs
 ```
 
-Pruebas: `pytest` (usan SQLite, no requieren MySQL).
+Pruebas: `pytest` (usan SQLite, no requieren conexión a Supabase).
 
 ### 3. Frontend
 

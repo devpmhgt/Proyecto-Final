@@ -7,6 +7,8 @@ Uso:  python seed.py            (crea tablas y datos si la base está vacía)
 import sys
 from datetime import date, time
 
+from sqlalchemy import text
+
 from app.core.security import hash_password
 from app.db.session import Base, SessionLocal, engine
 from app.models import (
@@ -113,6 +115,12 @@ def main():
     if "--reset" in sys.argv:
         Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    if engine.dialect.name == "postgresql":
+        # Supabase expone el esquema public por su API REST: con RLS activo y sin políticas,
+        # las claves anon/authenticated no pueden leer ni escribir. El backend (dueño de las tablas) no se ve afectado.
+        with engine.begin() as conn:
+            for tabla in Base.metadata.sorted_tables:
+                conn.execute(text(f'ALTER TABLE "{tabla.name}" ENABLE ROW LEVEL SECURITY'))
     with SessionLocal() as db:
         if db.query(Usuario).first():
             print("La base ya contiene datos; use --reset para recrearla.")
