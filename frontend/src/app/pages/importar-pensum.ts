@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { ApiService } from '../core/api.service';
@@ -40,13 +40,18 @@ import { Carrera, FilaPensum, ImportacionPensum } from '../core/models';
           Use un prefijo si otra carrera usa los mismos códigos (001, 002…), para que no se mezclen los cursos.
         </p>
         <div class="row">
-          <button type="submit" class="secondary" [disabled]="form.invalid || !archivo() || cargando()">
-            {{ cargando() ? 'Procesando…' : 'Vista previa' }}
-          </button>
-          @if (preview() && !preview()!.guardado) {
-            <button type="button" [disabled]="preview()!.errores.length > 0 || cargando()" (click)="importar()">
-              Importar {{ preview()!.cursos.length }} cursos
+          @if (preview() && !preview()!.guardado && !preview()!.errores.length) {
+            <button type="button" [disabled]="cargando()" (click)="importar()">
+              {{ cargando() ? 'Cargando…' : 'Cargar pensum (' + preview()!.cursos.length + ' cursos)' }}
             </button>
+            <span class="muted">Revise la vista previa de abajo y confirme la carga.</span>
+          } @else {
+            <button type="submit" [disabled]="form.invalid || !archivo() || cargando()">
+              {{ cargando() ? 'Revisando archivo…' : 'Revisar archivo' }}
+            </button>
+            @if (faltan().length && !cargando()) {
+              <span class="muted">Falta: {{ faltan().join(', ') }}</span>
+            }
           }
         </div>
       </form>
@@ -119,9 +124,38 @@ export class ImportarPensum {
     prefijo: [''],
   });
 
+  protected readonly faltan = computed(() => {
+    this.valores();
+    const f: string[] = [];
+    if (!this.archivo()) f.push('elegir el archivo CSV');
+    if (!this.form.value.carrera_id) f.push('carrera');
+    if (!this.form.value.plan_codigo) f.push('código del plan');
+    if (!this.form.value.plan_nombre) f.push('nombre del plan');
+    return f;
+  });
+  private readonly valores = signal(0);
+
   constructor() {
     // Cualquier cambio en el formulario invalida la vista previa anterior
-    this.form.valueChanges.subscribe(() => this.preview.set(null));
+    this.form.valueChanges.subscribe(() => {
+      this.preview.set(null);
+      this.valores.update((v) => v + 1);
+    });
+    // Al elegir la carrera, propone código y nombre del plan si están vacíos
+    this.form.controls.carrera_id.valueChanges.subscribe((id) => this.proponerPlan(id));
+    // Si hay una sola carrera (o ninguna elegida), selecciona la primera
+    effect(() => {
+      const lista = this.carreras();
+      if (lista.length && !this.form.value.carrera_id) this.form.controls.carrera_id.setValue(lista[0].id);
+    });
+  }
+
+  private proponerPlan(id: number | null): void {
+    const c = this.carreras().find((x) => x.id === id);
+    if (!c) return;
+    const anio = this.form.value.anio ?? new Date().getFullYear();
+    if (!this.form.value.plan_codigo) this.form.controls.plan_codigo.setValue(`${c.codigo}-${anio}`);
+    if (!this.form.value.plan_nombre) this.form.controls.plan_nombre.setValue(`Pensum ${c.nombre} ${anio}`);
   }
 
   elegirArchivo(ev: Event): void {
@@ -129,6 +163,8 @@ export class ImportarPensum {
     this.archivo.set(f);
     this.preview.set(null);
     this.exito.set('');
+    // Revisión automática al elegir el archivo
+    if (f && this.form.valid) this.previsualizar();
   }
 
   requisitos(f: FilaPensum): string {
