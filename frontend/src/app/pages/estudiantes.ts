@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 
 import { ApiService } from '../core/api.service';
 import { mensajeError } from '../core/auth.interceptor';
@@ -7,7 +8,7 @@ import { Carrera, EstadoEstudiante, Estudiante, Inscripcion, Plan } from '../cor
 
 @Component({
   selector: 'app-estudiantes',
-  imports: [ReactiveFormsModule, FormsModule],
+  imports: [ReactiveFormsModule, FormsModule, RouterLink],
   template: `
     <div class="row"><h1>Estudiantes</h1><span class="spacer"></span>
       <button (click)="nuevo()">+ Nuevo estudiante</button>
@@ -80,6 +81,7 @@ import { Carrera, EstadoEstudiante, Estudiante, Inscripcion, Plan } from '../cor
                 <td class="right">
                   <button class="link" (click)="editar(e)">Editar</button>
                   <button class="link" (click)="verHistorial(e)">Historial</button>
+                  <a class="link" [routerLink]="['/avance']" [queryParams]="{ estudiante: e.id }">Avance</a>
                 </td>
               </tr>
             } @empty { <tr><td colspan="7" class="muted">Sin resultados.</td></tr> }

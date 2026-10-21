@@ -3,23 +3,31 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 
 import { ApiService } from '../core/api.service';
 import { mensajeError } from '../core/auth.interceptor';
+import { AuthService } from '../core/auth.service';
 import { Carrera, Curso, Plan } from '../core/models';
+import { ImportarPensum } from './importar-pensum';
 
-type Pestana = 'carreras' | 'cursos' | 'planes';
+type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
 
 @Component({
   selector: 'app-catalogo',
-  imports: [ReactiveFormsModule, FormsModule],
+  imports: [ReactiveFormsModule, FormsModule, ImportarPensum],
   template: `
     <h1>Catálogo académico</h1>
     <div class="tabs">
       <button [class.active]="tab() === 'carreras'" (click)="tab.set('carreras')">Carreras</button>
       <button [class.active]="tab() === 'cursos'" (click)="tab.set('cursos')">Cursos y prerrequisitos</button>
       <button [class.active]="tab() === 'planes'" (click)="tab.set('planes')">Planes de estudio</button>
+      @if (esAdmin) {
+        <button [class.active]="tab() === 'importar'" (click)="tab.set('importar')">Importar pensum (CSV)</button>
+      }
     </div>
     @if (error()) { <div class="alert error">{{ error() }}</div> }
 
     @switch (tab()) {
+      @case ('importar') {
+        <app-importar-pensum [carreras]="carreras()" (importado)="alImportar($event)" />
+      }
       @case ('carreras') {
         <form class="card" [formGroup]="fCarrera" (ngSubmit)="guardarCarrera()">
           <h2>{{ carreraEdit() ? 'Editar carrera' : 'Nueva carrera' }}</h2>
@@ -58,6 +66,7 @@ type Pestana = 'carreras' | 'cursos' | 'planes';
             <label>Nombre <input formControlName="nombre" /></label>
             <label>Créditos <input type="number" formControlName="creditos" /></label>
             <label>Horas por semana <input type="number" formControlName="horas_semana" /></label>
+            <label>Créditos aprobados requeridos <input type="number" min="0" formControlName="creditos_requeridos" placeholder="ej. 70" /></label>
             <label>Prerrequisitos (Ctrl+clic para varios)
               <select multiple formControlName="prerrequisito_ids">
                 @for (c of cursos(); track c.id) {
@@ -81,7 +90,8 @@ type Pestana = 'carreras' | 'cursos' | 'planes';
                   <td>{{ c.codigo }}</td><td>{{ c.nombre }}</td><td>{{ c.creditos }}</td><td>{{ c.horas_semana }}</td>
                   <td>
                     @for (p of c.prerrequisitos; track p.id) { <span class="badge">{{ p.codigo }}</span>&nbsp; }
-                    @empty { <span class="muted">—</span> }
+                    @if (c.creditos_requeridos) { <span class="badge warn">{{ c.creditos_requeridos }} Crs.</span> }
+                    @if (!c.prerrequisitos.length && !c.creditos_requeridos) { <span class="muted">—</span> }
                   </td>
                   <td class="right"><button class="link" (click)="editarCurso(c)">Editar</button></td>
                 </tr>
@@ -150,6 +160,7 @@ type Pestana = 'carreras' | 'cursos' | 'planes';
 export class CatalogoPage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
+  protected readonly esAdmin = inject(AuthService).tieneRol('admin');
 
   protected readonly tab = signal<Pestana>('carreras');
   protected readonly error = signal('');
@@ -178,6 +189,7 @@ export class CatalogoPage implements OnInit {
     creditos: [4, [Validators.required, Validators.min(0)]],
     horas_semana: [4, Validators.min(0)],
     descripcion: [''],
+    creditos_requeridos: [null as number | null, Validators.min(0)],
     prerrequisito_ids: [[] as number[]],
   });
   protected readonly fPlan = this.fb.group({
@@ -191,6 +203,11 @@ export class CatalogoPage implements OnInit {
     this.api.carreras().subscribe((c) => this.carreras.set(c));
     this.api.cursos().subscribe((c) => this.cursos.set(c));
     this.cargarPlanes();
+  }
+
+  alImportar(planId: number): void {
+    this.api.cursos().subscribe((c) => this.cursos.set(c));
+    this.cargarPlanes(planId);
   }
 
   private cargarPlanes(seleccionar?: number): void {

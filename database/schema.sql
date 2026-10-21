@@ -35,6 +35,7 @@ CREATE TABLE cursos (
 	creditos INTEGER NOT NULL, 
 	horas_semana INTEGER NOT NULL, 
 	descripcion TEXT, 
+	creditos_requeridos INTEGER, 
 	PRIMARY KEY (id), 
 	UNIQUE (codigo)
 );

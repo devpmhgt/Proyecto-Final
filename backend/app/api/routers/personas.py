@@ -6,6 +6,7 @@ from app.api.deps import DB, CurrentUser, GestionUser, PersonalUser, docente_de,
 from app.core.security import hash_password
 from app.models import Carrera, DisponibilidadDocente, Docente, EstadoEstudiante, Estudiante, Rol, Usuario
 from app.schemas.personas import (
+    Avance,
     DisponibilidadIn,
     DocenteIn,
     DocenteOut,
@@ -14,6 +15,7 @@ from app.schemas.personas import (
     EstudianteOut,
     EstudianteUpdate,
 )
+from app.services.avance import calcular_avance
 from app.services.transversal import auditar
 
 router = APIRouter(tags=["3. Estudiantes y docentes"])
@@ -53,6 +55,19 @@ def mi_expediente(db: DB, usuario: CurrentUser):
     if est is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "El usuario no tiene expediente de estudiante")
     return est
+
+
+@router.get("/estudiantes/me/avance", response_model=Avance)
+def mi_avance(db: DB, usuario: CurrentUser):
+    est = estudiante_de(db, usuario)
+    if est is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "El usuario no tiene expediente de estudiante")
+    return calcular_avance(db, est)
+
+
+@router.get("/estudiantes/{estudiante_id}/avance", response_model=Avance)
+def avance_estudiante(estudiante_id: int, db: DB, _: GestionUser):
+    return calcular_avance(db, get_or_404(db, Estudiante, estudiante_id))
 
 
 @router.get("/estudiantes/{estudiante_id}", response_model=EstudianteOut)

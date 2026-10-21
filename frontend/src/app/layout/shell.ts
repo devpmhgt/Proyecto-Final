@@ -19,6 +19,7 @@ const MENU: ItemMenu[] = [
   { ruta: '/docentes', texto: 'Docentes', roles: ['admin', 'coordinador'] },
   { ruta: '/catalogo', texto: 'Catálogo académico', roles: ['admin', 'coordinador'] },
   { ruta: '/oferta', texto: 'Oferta y horarios', roles: ['admin', 'coordinador'] },
+  { ruta: '/avance', texto: 'Mi avance', roles: ['estudiante'] },
   { ruta: '/inscripciones', texto: 'Inscripciones', roles: ['admin', 'coordinador', 'estudiante'] },
   { ruta: '/notas', texto: 'Notas y actas', roles: ['admin', 'coordinador', 'docente'] },
   { ruta: '/auditoria', texto: 'Auditoría', roles: ['admin'] },

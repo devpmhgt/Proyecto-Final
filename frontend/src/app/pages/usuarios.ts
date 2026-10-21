@@ -38,8 +38,8 @@ import { Rol, Usuario } from '../core/models';
               <td>{{ u.nombre }}</td>
               <td>{{ u.email }}</td>
               <td>
-                <select [value]="u.rol" (change)="cambiarRol(u, $any($event.target).value)">
-                  @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
+                <select (change)="cambiarRol(u, $any($event.target).value)">
+                  @for (r of roles; track r) { <option [value]="r" [selected]="r === u.rol">{{ r }}</option> }
                 </select>
               </td>
               <td>{{ u.creado_en | date: 'shortDate' }}</td>

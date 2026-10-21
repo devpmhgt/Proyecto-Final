@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 import {
   Acta,
+  Avance,
   Auditoria,
   Aula,
   Carrera,
@@ -12,6 +13,7 @@ import {
   Docente,
   Estudiante,
   Evaluacion,
+  ImportacionPensum,
   Indicadores,
   Inscripcion,
   Institucion,
@@ -72,6 +74,8 @@ export class ApiService {
   // 3. Estudiantes y docentes
   estudiantes = (f?: Filtros) => this.get<Estudiante[]>('/estudiantes', f);
   miExpediente = () => this.get<Estudiante>('/estudiantes/me');
+  miAvance = () => this.get<Avance>('/estudiantes/me/avance');
+  avanceEstudiante = (id: number) => this.get<Avance>(`/estudiantes/${id}/avance`);
   crearEstudiante = (d: Partial<Estudiante> & { password?: string }) => this.post<Estudiante>('/estudiantes', d);
   actualizarEstudiante = (id: number, d: Partial<Estudiante>) => this.patch<Estudiante>(`/estudiantes/${id}`, d);
   docentes = (f?: Filtros) => this.get<Docente[]>('/docentes', f);
@@ -93,6 +97,8 @@ export class ApiService {
   agregarCursoPlan = (planId: number, curso_id: number, semestre: number) =>
     this.post<Plan>(`/planes/${planId}/cursos`, { curso_id, semestre });
   quitarCursoPlan = (planId: number, cursoId: number) => this.delete<Plan>(`/planes/${planId}/cursos/${cursoId}`);
+  /** confirmar=false devuelve solo la vista previa; true guarda el pensum. */
+  importarPensum = (datos: FormData) => this.post<ImportacionPensum>('/planes/importar-csv', datos);
 
   // 5. Oferta y planificación
   periodos = () => this.get<Periodo[]>('/periodos');

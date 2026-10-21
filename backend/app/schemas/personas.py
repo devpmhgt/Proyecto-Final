@@ -1,4 +1,5 @@
 from datetime import date, time
+from decimal import Decimal
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
@@ -97,3 +98,52 @@ class DocenteOut(ORMModel):
     max_horas_semana: int
     estado: EstadoDocente
     disponibilidad: list[DisponibilidadOut] = []
+
+
+class PrerrequisitoAvance(BaseModel):
+    id: int
+    codigo: str
+    nombre: str
+
+
+class CursoAvance(BaseModel):
+    id: int
+    codigo: str
+    nombre: str
+    creditos: int
+    semestre: int
+    estado: str  # aprobado | en_curso | disponible | bloqueado
+    nota: Decimal | None
+    intentos_reprobados: int
+    prerrequisitos: list[PrerrequisitoAvance]
+    creditos_requeridos: int | None
+    faltantes: list[str]
+    creditos_faltantes: int
+    desbloquea: list[int]
+
+
+class CicloAvance(BaseModel):
+    semestre: int
+    cursos: list[CursoAvance]
+
+
+class PlanResumen(BaseModel):
+    id: int
+    codigo: str
+    nombre: str
+
+
+class Avance(BaseModel):
+    estudiante: dict
+    carrera: str
+    plan: PlanResumen | None
+    creditos_aprobados: int
+    creditos_aprobados_total: int
+    creditos_totales: int
+    porcentaje: float
+    promedio: Decimal | None
+    cursos_aprobados: int
+    cursos_totales: int
+    en_curso: int
+    disponibles: int
+    ciclos: list[CicloAvance]

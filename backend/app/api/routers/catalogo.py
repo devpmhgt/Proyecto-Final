@@ -1,8 +1,20 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
 
-from app.api.deps import DB, CurrentUser, GestionUser, get_or_404
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+
+from app.api.deps import DB, AdminUser, CurrentUser, GestionUser, get_or_404
 from app.models import Carrera, Curso, PlanCurso, PlanEstudio
-from app.schemas.catalogo import CarreraIn, CarreraOut, CursoIn, CursoOut, PlanCursoIn, PlanIn, PlanOut
+from app.schemas.catalogo import (
+    CarreraIn,
+    CarreraOut,
+    CursoIn,
+    CursoOut,
+    ImportacionPensumOut,
+    PlanCursoIn,
+    PlanIn,
+    PlanOut,
+)
+from app.services import pensum
 from app.services.transversal import auditar
 
 router = APIRouter(tags=["4. Catálogo académico"])
@@ -150,3 +162,59 @@ def quitar_curso_plan(plan_id: int, curso_id: int, db: DB, gestor: GestionUser):
     db.commit()
     db.refresh(plan)
     return plan
+
+
+# ---------- Importación de pensum desde CSV ----------
+
+MAX_CSV_BYTES = 1_000_000
+
+
+@router.post("/planes/importar-csv", response_model=ImportacionPensumOut)
+async def importar_pensum(
+    db: DB,
+    admin: AdminUser,
+    archivo: Annotated[UploadFile, File(description="CSV: Ciclo, Código, Nombre del Curso, Créditos, Pre-Requisitos")],
+    carrera_id: Annotated[int, Form()],
+    plan_codigo: Annotated[str, Form(min_length=1, max_length=30)],
+    plan_nombre: Annotated[str, Form(min_length=1, max_length=150)],
+    anio: Annotated[int, Form(ge=1900, le=2200)],
+    prefijo: Annotated[str, Form(max_length=10)] = "",
+    confirmar: Annotated[bool, Form()] = False,
+):
+    """Con `confirmar=false` solo valida y devuelve la vista previa; con `true` guarda (todo o nada)."""
+    carrera = get_or_404(db, Carrera, carrera_id)
+    contenido = await archivo.read(MAX_CSV_BYTES + 1)
+    if len(contenido) > MAX_CSV_BYTES:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "El archivo supera 1 MB")
+
+    res = pensum.leer_csv(contenido, prefijo.strip())
+    if res.filas:
+        pensum.validar_contra_bd(db, res)
+    plan_existente = db.query(PlanEstudio).filter(PlanEstudio.codigo == plan_codigo).first()
+    if plan_existente and plan_existente.carrera_id != carrera.id:
+        res.errores.append(f"El plan {plan_codigo} ya existe y pertenece a otra carrera")
+    elif plan_existente:
+        res.advertencias.append(f"El plan {plan_codigo} ya existe: su lista de cursos se reemplazará por la del archivo")
+
+    plan_id = None
+    if confirmar:
+        if res.errores:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Corrija los errores del archivo antes de importar")
+        plan = pensum.guardar(db, res, carrera, plan_codigo, plan_nombre, anio)
+        plan_id = plan.id
+        auditar(db, admin, "importar_pensum", "plan_estudio", plan.id, {
+            "archivo": archivo.filename, "cursos": len(res.filas),
+            "creados": sum(f.accion == "crear" for f in res.filas),
+            "actualizados": sum(f.accion == "actualizar" for f in res.filas),
+        })
+        db.commit()
+
+    return ImportacionPensumOut(
+        cursos=[vars(f) for f in res.filas],
+        errores=res.errores,
+        advertencias=res.advertencias,
+        total_creditos=sum(f.creditos for f in res.filas),
+        ciclos=len({f.semestre for f in res.filas}),
+        guardado=confirmar,
+        plan_id=plan_id,
+    )

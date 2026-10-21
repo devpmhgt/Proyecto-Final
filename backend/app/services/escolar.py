@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
+    Curso,
     EstadoEstudiante,
     EstadoInscripcion,
     EstadoPeriodo,
@@ -42,6 +43,19 @@ def cursos_aprobados(db: Session, estudiante_id: int) -> set[int]:
         .all()
     )
     return {f[0] for f in filas}
+
+
+def creditos_aprobados(db: Session, estudiante_id: int) -> int:
+    """Créditos de cursos distintos aprobados (un curso aprobado dos veces cuenta una sola vez)."""
+    filas = (
+        db.query(Curso.id, Curso.creditos)
+        .join(Seccion, Seccion.curso_id == Curso.id)
+        .join(Inscripcion, Inscripcion.seccion_id == Seccion.id)
+        .filter(Inscripcion.estudiante_id == estudiante_id, Inscripcion.estado == EstadoInscripcion.APROBADO)
+        .distinct()
+        .all()
+    )
+    return sum(c for _, c in filas)
 
 
 def inscribir(db: Session, estudiante: Estudiante, seccion: Seccion) -> Inscripcion:
@@ -80,6 +94,11 @@ def inscribir(db: Session, estudiante: Estudiante, seccion: Seccion) -> Inscripc
     faltantes = [p.codigo for p in seccion.curso.prerrequisitos if p.id not in aprobados]
     if faltantes:
         raise _regla(f"Prerrequisitos pendientes: {', '.join(faltantes)}")
+    requeridos = seccion.curso.creditos_requeridos or 0
+    if requeridos:
+        acumulados = creditos_aprobados(db, estudiante.id)
+        if acumulados < requeridos:
+            raise _regla(f"El curso {seccion.curso.codigo} requiere {requeridos} créditos aprobados (tiene {acumulados})")
 
     if inscritos_en(db, seccion.id) >= seccion.cupo:
         raise _regla("La sección no tiene cupos disponibles")

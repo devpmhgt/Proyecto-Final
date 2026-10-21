@@ -30,7 +30,7 @@ export function mensajeError(err: unknown): string {
     if (typeof detail === 'string') return detail;
     if (Array.isArray(detail)) return detail.map((d) => `${d.loc?.slice(-1)[0] ?? ''}: ${d.msg}`).join('; ');
     if (err.status === 0) return 'No se pudo conectar con el servidor. Verifique que el backend esté en ejecución.';
-    if (err.status >= 500) return 'Error interno del servidor. Revise la consola del backend (¿conexión a MySQL?).';
+    if (err.status >= 500) return 'Error interno del servidor. Revise la consola del backend (¿conexión a la base de datos?).';
     return `Error ${err.status}`;
   }
   return 'Error inesperado';

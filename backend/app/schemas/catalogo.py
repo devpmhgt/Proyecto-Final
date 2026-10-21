@@ -20,6 +20,7 @@ class CursoIn(BaseModel):
     creditos: int = Field(ge=0, le=20)
     horas_semana: int = Field(default=4, ge=0, le=40)
     descripcion: str | None = None
+    creditos_requeridos: int | None = Field(default=None, ge=0)
     prerrequisito_ids: list[int] = []
 
 
@@ -37,6 +38,7 @@ class CursoOut(ORMModel):
     creditos: int
     horas_semana: int
     descripcion: str | None
+    creditos_requeridos: int | None = None
     prerrequisitos: list[CursoResumen] = []
 
 
@@ -62,3 +64,25 @@ class PlanIn(BaseModel):
 class PlanOut(ORMModel, PlanIn):
     id: int
     cursos: list[PlanCursoOut] = []
+
+
+class FilaPensumOut(BaseModel):
+    linea: int
+    ciclo: str
+    semestre: int
+    codigo: str
+    nombre: str
+    creditos: int
+    prerrequisitos: list[str]
+    creditos_requeridos: int | None
+    accion: str
+
+
+class ImportacionPensumOut(BaseModel):
+    cursos: list[FilaPensumOut]
+    errores: list[str]
+    advertencias: list[str]
+    total_creditos: int
+    ciclos: int
+    guardado: bool
+    plan_id: int | None = None

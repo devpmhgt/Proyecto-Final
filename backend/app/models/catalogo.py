@@ -32,6 +32,8 @@ class Curso(Base):
     creditos: Mapped[int] = mapped_column(Integer)
     horas_semana: Mapped[int] = mapped_column(Integer, default=4)
     descripcion: Mapped[str | None] = mapped_column(Text)
+    # Prerrequisito por créditos (p. ej. "70 Crs." en el pensum): créditos aprobados mínimos para cursarlo
+    creditos_requeridos: Mapped[int | None] = mapped_column(Integer)
 
     prerrequisitos: Mapped[list["Curso"]] = relationship(
         secondary=prerrequisitos,

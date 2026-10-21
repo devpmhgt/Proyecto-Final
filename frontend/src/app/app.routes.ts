@@ -51,6 +51,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/inscripciones').then((m) => m.InscripcionesPage),
       },
       {
+        path: 'avance',
+        data: { roles: [...GESTION, 'estudiante'] },
+        loadComponent: () => import('./pages/avance').then((m) => m.AvancePage),
+      },
+      {
         path: 'notas',
         data: { roles: [...GESTION, 'docente'] },
         loadComponent: () => import('./pages/notas').then((m) => m.NotasPage),

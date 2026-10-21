@@ -50,7 +50,8 @@ import { DIAS, Indicadores, Inscripcion, Seccion } from '../core/models';
 
     @if (auth.rol() === 'estudiante') {
       <div class="card">
-        <div class="row"><h2>Mis cursos inscritos</h2><span class="spacer"></span><a routerLink="/inscripciones">Ir a inscripciones →</a></div>
+        <div class="row"><h2>Mis cursos inscritos</h2><span class="spacer"></span>
+          <a routerLink="/avance">Ver mi avance →</a>&nbsp;·&nbsp;<a routerLink="/inscripciones">Ir a inscripciones →</a></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Curso</th><th>Sección</th><th>Docente</th><th>Horario</th><th>Estado</th><th>Nota</th></tr></thead>

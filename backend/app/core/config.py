@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,15 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
     cors_origins: str = "http://localhost:4200"
+
+    @field_validator("database_url")
+    @classmethod
+    def _driver_postgres(cls, v: str) -> str:
+        # Supabase entrega "postgresql://" o "postgres://"; SQLAlchemy necesita indicar el driver psycopg (v3)
+        for prefijo in ("postgresql://", "postgres://"):
+            if v.startswith(prefijo):
+                return "postgresql+psycopg://" + v[len(prefijo):]
+        return v
 
     @property
     def cors_origins_list(self) -> list[str]:

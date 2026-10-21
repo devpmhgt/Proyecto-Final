@@ -51,6 +51,7 @@ export interface CursoResumen {
 export interface Curso extends CursoResumen {
   horas_semana: number;
   descripcion: string | null;
+  creditos_requeridos: number | null;
   prerrequisitos: CursoResumen[];
 }
 
@@ -216,6 +217,62 @@ export interface Indicadores {
   tasa_aprobacion: number | null;
   estudiantes_por_carrera: { nombre: string; total: number }[];
   estudiantes_por_estado: { estado: string; total: number }[];
+}
+
+export interface FilaPensum {
+  linea: number;
+  ciclo: string;
+  semestre: number;
+  codigo: string;
+  nombre: string;
+  creditos: number;
+  prerrequisitos: string[];
+  creditos_requeridos: number | null;
+  accion: 'crear' | 'actualizar';
+}
+
+export interface ImportacionPensum {
+  cursos: FilaPensum[];
+  errores: string[];
+  advertencias: string[];
+  total_creditos: number;
+  ciclos: number;
+  guardado: boolean;
+  plan_id: number | null;
+}
+
+export type EstadoAvance = 'aprobado' | 'en_curso' | 'disponible' | 'bloqueado';
+
+export interface CursoAvance {
+  id: number;
+  codigo: string;
+  nombre: string;
+  creditos: number;
+  semestre: number;
+  estado: EstadoAvance;
+  nota: string | null;
+  intentos_reprobados: number;
+  prerrequisitos: { id: number; codigo: string; nombre: string }[];
+  creditos_requeridos: number | null;
+  faltantes: string[];
+  creditos_faltantes: number;
+  desbloquea: number[];
+}
+
+export interface Avance {
+  estudiante: EstudianteResumen;
+  carrera: string;
+  plan: { id: number; codigo: string; nombre: string } | null;
+  creditos_aprobados: number;
+  creditos_aprobados_total: number;
+  creditos_totales: number;
+  porcentaje: number;
+  promedio: string | null;
+  cursos_aprobados: number;
+  cursos_totales: number;
+  en_curso: number;
+  disponibles: number;
+  ciclos: { semestre: number; cursos: CursoAvance[] }[];
 }
 
 export const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
