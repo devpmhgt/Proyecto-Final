@@ -78,3 +78,12 @@ def test_notas_y_cierre_de_acta(client):
     assert any(a["accion"] == "cerrar_acta" for a in log)
     ind = client.get("/api/indicadores", headers=admin).json()
     assert ind["tasa_aprobacion"] == 100.0
+
+
+def test_limite_de_retiro_dentro_del_periodo(client):
+    coord = login(client, "coordinador@saiu.edu")
+    base = {"codigo": "2027-B", "nombre": "Segundo semestre 2027", "fecha_inicio": "2027-07-01", "fecha_fin": "2027-11-30"}
+    r = client.post("/api/periodos", headers=coord, json={**base, "fecha_limite_retiro": "2027-12-24"})
+    assert r.status_code == 422 and "límite de retiro" in r.text
+    r = client.post("/api/periodos", headers=coord, json={**base, "fecha_limite_retiro": "2027-09-15"})
+    assert r.status_code == 201

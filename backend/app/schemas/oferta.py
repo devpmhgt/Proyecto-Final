@@ -19,6 +19,8 @@ class PeriodoIn(BaseModel):
     def _fechas(self):
         if self.fecha_fin <= self.fecha_inicio:
             raise ValueError("fecha_fin debe ser posterior a fecha_inicio")
+        if self.fecha_limite_retiro and not self.fecha_inicio <= self.fecha_limite_retiro <= self.fecha_fin:
+            raise ValueError("la fecha límite de retiro debe estar entre el inicio y el fin del periodo")
         return self
 
 

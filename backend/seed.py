@@ -91,7 +91,7 @@ def cargar(db):
     db.add_all([a1, a2])
 
     periodo = Periodo(codigo="2026-2", nombre="Segundo semestre 2026", fecha_inicio=date(2026, 7, 15),
-                      fecha_fin=date(2026, 11, 30), fecha_limite_retiro=date(2026, 12, 31),
+                      fecha_fin=date(2026, 11, 30), fecha_limite_retiro=date(2026, 11, 15),
                       estado=EstadoPeriodo.INSCRIPCION)
     db.add(periodo)
     db.flush()
