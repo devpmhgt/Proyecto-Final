@@ -3,6 +3,7 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { RouterLink } from '@angular/router';
 
 import { ApiService } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { mensajeError } from '../core/auth.interceptor';
 import { Carrera, EstadoEstudiante, Estudiante, Inscripcion, Plan, Usuario } from '../core/models';
 
@@ -104,6 +105,7 @@ import { Carrera, EstadoEstudiante, Estudiante, Inscripcion, Plan, Usuario } fro
                   <button class="link" (click)="editar(e)">Editar</button>
                   <button class="link" (click)="verHistorial(e)">Historial</button>
                   <a class="link" [routerLink]="['/avance']" [queryParams]="{ estudiante: e.id }">Avance</a>
+                  @if (esAdmin) { <button class="link peligro" (click)="eliminar(e)">Eliminar</button> }
                 </td>
               </tr>
             } @empty { <tr><td colspan="7" class="muted">Sin resultados.</td></tr> }
@@ -135,6 +137,7 @@ import { Carrera, EstadoEstudiante, Estudiante, Inscripcion, Plan, Usuario } fro
 })
 export class EstudiantesPage implements OnInit {
   private readonly api = inject(ApiService);
+  protected readonly esAdmin = inject(AuthService).tieneRol('admin');
 
   protected readonly estados: EstadoEstudiante[] = ['activo', 'inactivo', 'suspendido', 'egresado', 'graduado'];
   protected readonly estudiantes = signal<Estudiante[]>([]);
@@ -238,6 +241,20 @@ export class EstudiantesPage implements OnInit {
         this.cargar();
       },
       error: (e) => this.error.set(mensajeError(e)),
+    });
+  }
+
+  eliminar(e: Estudiante): void {
+    const cuenta = e.usuario_id ? ' Su cuenta de acceso se desactivará.' : '';
+    if (!confirm(`¿Eliminar el expediente de ${e.nombres} ${e.apellidos} (carné ${e.carnet})?${cuenta} Esta acción no se puede deshacer.`)) return;
+    this.error.set('');
+    this.api.eliminarEstudiante(e.id).subscribe({
+      next: () => {
+        if (this.historial()?.id === e.id) this.historial.set(null);
+        if ((this.editando() as Estudiante | null | undefined)?.id === e.id) this.editando.set(undefined);
+        this.cargar();
+      },
+      error: (err) => this.error.set(mensajeError(err)),
     });
   }
 

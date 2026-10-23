@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { ApiService } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { mensajeError } from '../core/auth.interceptor';
 import { DIAS, Disponibilidad, Docente, Usuario } from '../core/models';
 
@@ -82,6 +83,7 @@ import { DIAS, Disponibilidad, Docente, Usuario } from '../core/models';
                 <td class="right">
                   <button class="link" (click)="editar(d)">Editar</button>
                   <button class="link" (click)="verDisponibilidad(d)">Disponibilidad</button>
+                  @if (esAdmin) { <button class="link peligro" (click)="eliminar(d)">Eliminar</button> }
                 </td>
               </tr>
             }
@@ -121,6 +123,7 @@ import { DIAS, Disponibilidad, Docente, Usuario } from '../core/models';
 })
 export class DocentesPage implements OnInit {
   private readonly api = inject(ApiService);
+  protected readonly esAdmin = inject(AuthService).tieneRol('admin');
   protected readonly dias = DIAS;
 
   protected readonly docentes = signal<Docente[]>([]);
@@ -206,6 +209,20 @@ export class DocentesPage implements OnInit {
         this.cargar();
       },
       error: (e) => this.error.set(mensajeError(e)),
+    });
+  }
+
+  eliminar(d: Docente): void {
+    const cuenta = d.usuario_id ? ' Su cuenta de acceso se desactivará.' : '';
+    if (!confirm(`¿Eliminar al docente ${d.nombres} ${d.apellidos} (código ${d.codigo})?${cuenta} Esta acción no se puede deshacer.`)) return;
+    this.error.set('');
+    this.api.eliminarDocente(d.id).subscribe({
+      next: () => {
+        if (this.seleccionado()?.id === d.id) this.seleccionado.set(null);
+        if ((this.editando() as Docente | null | undefined)?.id === d.id) this.editando.set(undefined);
+        this.cargar();
+      },
+      error: (err) => this.error.set(mensajeError(err)),
     });
   }
 

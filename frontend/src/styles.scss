@@ -157,3 +157,4 @@ td input { width: 5.5rem; }
 
 .acceso { display: grid; gap: .5rem; padding: .75rem 1rem; margin-bottom: .75rem; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--bg); }
 .acceso h3, .acceso p { margin: 0; }
+button.link.peligro { color: var(--danger); }

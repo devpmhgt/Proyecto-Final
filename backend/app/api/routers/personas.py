@@ -2,9 +2,19 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.api.deps import DB, CurrentUser, GestionUser, PersonalUser, docente_de, estudiante_de, get_or_404
+from app.api.deps import DB, AdminUser, CurrentUser, GestionUser, PersonalUser, docente_de, estudiante_de, get_or_404
 from app.core.security import hash_password
-from app.models import Carrera, DisponibilidadDocente, Docente, EstadoEstudiante, Estudiante, Rol, Usuario
+from app.models import (
+    Carrera,
+    DisponibilidadDocente,
+    Docente,
+    EstadoEstudiante,
+    Estudiante,
+    Inscripcion,
+    Rol,
+    Seccion,
+    Usuario,
+)
 from app.schemas.auth import UsuarioOut
 from app.schemas.personas import (
     Avance,
@@ -279,3 +289,53 @@ def desvincular_docente(docente_id: int, db: DB, gestor: GestionUser):
     doc.usuario_id = None
     db.commit()
     return doc
+
+
+# ---------- Eliminación ----------
+
+def _liberar_cuenta(registro: Estudiante | Docente) -> str | None:
+    """Desactiva y desvincula la cuenta de acceso. No se borra para conservar la auditoría de sus acciones."""
+    if not registro.usuario:
+        return None
+    registro.usuario.activo = False
+    correo = registro.usuario.email
+    registro.usuario_id = None
+    return correo
+
+
+@router.delete("/estudiantes/{estudiante_id}", status_code=204)
+def eliminar_estudiante(estudiante_id: int, db: DB, admin: AdminUser):
+    est = get_or_404(db, Estudiante, estudiante_id)
+    inscripciones = db.query(Inscripcion).filter(Inscripcion.estudiante_id == est.id).count()
+    if inscripciones:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"No se puede eliminar a {est.nombres} {est.apellidos}: tiene {inscripciones} inscripción(es) en su historial. "
+            "Cambie su estado a inactivo para conservar sus notas.",
+        )
+    cuenta = _liberar_cuenta(est)
+    auditar(db, admin, "eliminar", "estudiante", est.id, {
+        "carnet": est.carnet, "nombre": f"{est.nombres} {est.apellidos}", "email": est.email,
+        "cuenta_desactivada": cuenta,
+    })
+    db.delete(est)
+    db.commit()
+
+
+@router.delete("/docentes/{docente_id}", status_code=204)
+def eliminar_docente(docente_id: int, db: DB, admin: AdminUser):
+    doc = get_or_404(db, Docente, docente_id)
+    secciones = db.query(Seccion).filter(Seccion.docente_id == doc.id).count()
+    if secciones:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"No se puede eliminar a {doc.nombres} {doc.apellidos}: tiene {secciones} sección(es) asignada(s). "
+            "Reasígnelas a otro docente en Oferta y horarios, o cambie su estado a inactivo.",
+        )
+    cuenta = _liberar_cuenta(doc)
+    auditar(db, admin, "eliminar", "docente", doc.id, {
+        "codigo": doc.codigo, "nombre": f"{doc.nombres} {doc.apellidos}", "email": doc.email,
+        "cuenta_desactivada": cuenta,
+    })
+    db.delete(doc)
+    db.commit()

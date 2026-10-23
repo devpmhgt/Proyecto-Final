@@ -80,6 +80,8 @@ export class ApiService {
   desvincularEstudiante = (id: number) => this.post<Estudiante>(`/estudiantes/${id}/desvincular`);
   vincularDocente = (id: number, usuario_id: number) => this.post<Docente>(`/docentes/${id}/vincular`, { usuario_id });
   desvincularDocente = (id: number) => this.post<Docente>(`/docentes/${id}/desvincular`);
+  eliminarEstudiante = (id: number) => this.delete<void>(`/estudiantes/${id}`);
+  eliminarDocente = (id: number) => this.delete<void>(`/docentes/${id}`);
   avanceEstudiante = (id: number) => this.get<Avance>(`/estudiantes/${id}/avance`);
   crearEstudiante = (d: Partial<Estudiante> & { password?: string }) => this.post<Estudiante>('/estudiantes', d);
   actualizarEstudiante = (id: number, d: Partial<Estudiante>) => this.patch<Estudiante>(`/estudiantes/${id}`, d);

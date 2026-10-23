@@ -92,3 +92,30 @@ def test_vincular_y_desvincular_cuenta(client):
     assert client.post(f"/api/estudiantes/{est['id']}/vincular", headers=admin, json={"usuario_id": coord_id}).status_code == 422
     # Coordinación puede vincular; un estudiante no
     assert client.get("/api/cuentas-sin-expediente?rol=estudiante", headers=h).status_code == 403
+
+
+def test_eliminar_estudiante_y_docente(client):
+    admin = login(client, "admin@saiu.edu")
+    coord = login(client, "coordinador@saiu.edu")
+    nuevo = client.post("/api/estudiantes", headers=admin, json=_estudiante(email="borrar@saiu.edu", password="borrar12345")).json()
+
+    assert client.delete(f"/api/estudiantes/{nuevo['id']}", headers=coord).status_code == 403
+    assert client.delete(f"/api/estudiantes/{nuevo['id']}", headers=admin).status_code == 204
+    assert all(e["id"] != nuevo["id"] for e in client.get("/api/estudiantes", headers=admin).json())
+    # Su cuenta queda desactivada (no puede entrar) pero se conserva
+    assert client.post("/api/auth/login", json={"email": "borrar@saiu.edu", "password": "borrar12345"}).status_code == 403
+
+    # Estudiante con historial: no se elimina
+    est = login(client, "estudiante@saiu.edu")
+    seccion = next(s for s in client.get("/api/secciones", headers=est).json() if s["curso"]["codigo"] == "PRG101")
+    client.post("/api/inscripciones", headers=est, json={"seccion_id": seccion["id"]})
+    luis = next(e for e in client.get("/api/estudiantes", headers=admin).json() if e["carnet"] == "2026001")
+    r = client.delete(f"/api/estudiantes/{luis['id']}", headers=admin)
+    assert r.status_code == 409 and "inactivo" in r.json()["detail"]
+
+    # Docente con secciones: no se elimina; sin secciones: sí
+    docentes = client.get("/api/docentes", headers=admin).json()
+    ana = next(d for d in docentes if d["codigo"] == "D001")
+    assert client.delete(f"/api/docentes/{ana['id']}", headers=admin).status_code == 409
+    libre = client.post("/api/docentes", headers=admin, json=_docente(email="docborrar@saiu.edu")).json()
+    assert client.delete(f"/api/docentes/{libre['id']}", headers=admin).status_code == 204
