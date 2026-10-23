@@ -75,6 +75,11 @@ export class ApiService {
   estudiantes = (f?: Filtros) => this.get<Estudiante[]>('/estudiantes', f);
   miExpediente = () => this.get<Estudiante>('/estudiantes/me');
   miAvance = () => this.get<Avance>('/estudiantes/me/avance');
+  cuentasSinExpediente = (rol: 'estudiante' | 'docente') => this.get<Usuario[]>('/cuentas-sin-expediente', { rol });
+  vincularEstudiante = (id: number, usuario_id: number) => this.post<Estudiante>(`/estudiantes/${id}/vincular`, { usuario_id });
+  desvincularEstudiante = (id: number) => this.post<Estudiante>(`/estudiantes/${id}/desvincular`);
+  vincularDocente = (id: number, usuario_id: number) => this.post<Docente>(`/docentes/${id}/vincular`, { usuario_id });
+  desvincularDocente = (id: number) => this.post<Docente>(`/docentes/${id}/desvincular`);
   avanceEstudiante = (id: number) => this.get<Avance>(`/estudiantes/${id}/avance`);
   crearEstudiante = (d: Partial<Estudiante> & { password?: string }) => this.post<Estudiante>('/estudiantes', d);
   actualizarEstudiante = (id: number, d: Partial<Estudiante>) => this.patch<Estudiante>(`/estudiantes/${id}`, d);

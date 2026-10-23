@@ -2,18 +2,20 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
 
 from app.api.deps import DB, AdminUser, CurrentUser, get_or_404
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import Usuario
 from app.schemas.auth import CambioPassword, LoginRequest, TokenResponse, UsuarioCreate, UsuarioOut, UsuarioUpdate
+from app.services.correos import validar_correo_disponible
 from app.services.transversal import auditar
 
 router = APIRouter(tags=["1-2. Autenticación y usuarios"])
 
 
 def _autenticar(db, email: str, password: str) -> TokenResponse:
-    usuario = db.query(Usuario).filter(Usuario.email == email.lower()).first()
+    usuario = db.query(Usuario).filter(func.lower(Usuario.email) == email.strip().lower()).first()
     if usuario is None or not verify_password(password, usuario.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Correo o contraseña incorrectos")
     if not usuario.activo:
@@ -56,10 +58,9 @@ def listar_usuarios(db: DB, _: AdminUser):
 
 @router.post("/usuarios", response_model=UsuarioOut, status_code=201)
 def crear_usuario(datos: UsuarioCreate, db: DB, admin: AdminUser):
-    if db.query(Usuario).filter(Usuario.email == datos.email.lower()).first():
-        raise HTTPException(status.HTTP_409_CONFLICT, "Ya existe un usuario con ese correo")
+    correo = validar_correo_disponible(db, datos.email)
     usuario = Usuario(
-        email=datos.email.lower(),
+        email=correo,
         nombre=datos.nombre,
         rol=datos.rol,
         activo=datos.activo,

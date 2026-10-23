@@ -31,6 +31,8 @@ class EstudianteUpdate(BaseModel):
     carrera_id: int | None = None
     plan_id: int | None = None
     estado: EstadoEstudiante | None = None
+    # Crea la cuenta de acceso si no tiene, o restablece su contraseña
+    password: str | None = Field(default=None, min_length=8)
 
 
 class EstudianteOut(ORMModel):
@@ -84,6 +86,8 @@ class DocenteUpdate(BaseModel):
     especialidad: str | None = None
     max_horas_semana: int | None = None
     estado: EstadoDocente | None = None
+    # Crea la cuenta de acceso si no tiene, o restablece su contraseña
+    password: str | None = Field(default=None, min_length=8)
 
 
 class DocenteOut(ORMModel):
@@ -147,3 +151,7 @@ class Avance(BaseModel):
     en_curso: int
     disponibles: int
     ciclos: list[CicloAvance]
+
+
+class VincularCuenta(BaseModel):
+    usuario_id: int

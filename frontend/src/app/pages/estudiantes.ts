@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 
 import { ApiService } from '../core/api.service';
 import { mensajeError } from '../core/auth.interceptor';
-import { Carrera, EstadoEstudiante, Estudiante, Inscripcion, Plan } from '../core/models';
+import { Carrera, EstadoEstudiante, Estudiante, Inscripcion, Plan, Usuario } from '../core/models';
 
 @Component({
   selector: 'app-estudiantes',
@@ -42,10 +42,32 @@ import { Carrera, EstadoEstudiante, Estudiante, Inscripcion, Plan } from '../cor
             </select>
           </label>
           <label>Fecha de ingreso <input type="date" formControlName="fecha_ingreso" /></label>
-          @if (!editando()) {
-            <label>Contraseña de acceso (opcional) <input type="password" formControlName="password" /></label>
-          }
+          <label>{{ !editando() ? 'Contraseña de acceso (opcional)' : editando()!.usuario_id ? 'Nueva contraseña (opcional)' : 'Crear acceso: contraseña (opcional)' }}
+            <input type="password" formControlName="password" autocomplete="new-password" placeholder="mínimo 8 caracteres" />
+          </label>
         </div>
+
+        @if (editando(); as ed) {
+          <div class="acceso">
+            <h3>Cuenta de acceso</h3>
+            @if (ed.usuario_id) {
+              <p>Vinculada: inicia sesión con <strong>{{ ed.email }}</strong>.</p>
+              <div class="row">
+                <button type="button" class="secondary small" (click)="desvincular(ed)">Desvincular cuenta</button>
+                <span class="muted">La cuenta no se borra; solo deja de estar asociada a este expediente.</span>
+              </div>
+            } @else {
+              <p class="muted">Sin cuenta. Escribe una contraseña arriba para crear una nueva, o vincula una cuenta que ya exista:</p>
+              <div class="row">
+                <select [(ngModel)]="cuentaSel" [ngModelOptions]="{ standalone: true }" aria-label="Cuenta existente">
+                  <option [ngValue]="null">{{ cuentasLibres().length ? 'Elige una cuenta…' : 'No hay cuentas de estudiante sin vincular' }}</option>
+                  @for (u of cuentasLibres(); track u.id) { <option [ngValue]="u.id">{{ u.nombre }} · {{ u.email }}</option> }
+                </select>
+                <button type="button" class="secondary" [disabled]="!cuentaSel" (click)="vincular(ed)">Vincular cuenta</button>
+              </div>
+            }
+          </div>
+        }
         <div class="row">
           <button type="submit" [disabled]="form.invalid">Guardar</button>
           <button type="button" class="secondary" (click)="editando.set(undefined)">Cancelar</button>
@@ -127,6 +149,8 @@ export class EstudiantesPage implements OnInit {
   protected readonly planesCarrera = computed(() => this.planes().filter((p) => p.carrera_id === this.carreraForm()));
 
   protected q = '';
+  protected cuentaSel: number | null = null;
+  protected readonly cuentasLibres = signal<Usuario[]>([]);
   protected filtroCarrera: number | null = null;
   protected filtroEstado = '';
 
@@ -169,6 +193,36 @@ export class EstudiantesPage implements OnInit {
   editar(e: Estudiante): void {
     this.form.reset({ ...e, password: '' });
     this.editando.set(e);
+    this.cuentaSel = null;
+    if (!e.usuario_id) this.cargarCuentasLibres();
+  }
+
+  private cargarCuentasLibres(): void {
+    this.api.cuentasSinExpediente('estudiante').subscribe((c) => this.cuentasLibres.set(c));
+  }
+
+  vincular(r: Estudiante): void {
+    this.error.set('');
+    this.api.vincularEstudiante(r.id, this.cuentaSel!).subscribe({
+      next: (act) => {
+        this.cuentaSel = null;
+        this.editar(act);
+        this.cargar();
+      },
+      error: (e) => this.error.set(mensajeError(e)),
+    });
+  }
+
+  desvincular(r: Estudiante): void {
+    if (!confirm(`¿Desvincular la cuenta ${r.email} de este expediente? La persona ya no podrá ver sus datos académicos.`)) return;
+    this.error.set('');
+    this.api.desvincularEstudiante(r.id).subscribe({
+      next: (act) => {
+        this.editar(act);
+        this.cargar();
+      },
+      error: (e) => this.error.set(mensajeError(e)),
+    });
   }
 
   guardar(): void {
@@ -176,7 +230,7 @@ export class EstudiantesPage implements OnInit {
     const { password, carnet, ...datos } = this.form.getRawValue();
     const actual = this.editando();
     const peticion = actual
-      ? this.api.actualizarEstudiante(actual.id, datos as Partial<Estudiante>)
+      ? this.api.actualizarEstudiante(actual.id, { ...datos, ...(password ? { password } : {}) } as Partial<Estudiante>)
       : this.api.crearEstudiante({ ...datos, carnet, ...(password ? { password } : {}) } as Partial<Estudiante>);
     peticion.subscribe({
       next: () => {
