@@ -112,6 +112,32 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
             @if (cursoEdit()) { <button type="button" class="secondary" (click)="limpiarCurso()">Cancelar</button> }
           </div>
         </form>
+
+        <div class="card">
+          <h2>Consultar curso</h2>
+          <div class="form-grid">
+            <label>Código
+              <select [ngModel]="cursoConsultaId()" (ngModelChange)="cursoConsultaId.set($event)">
+                <option [ngValue]="null">Seleccione un código…</option>
+                @for (c of cursosCarrera(); track c.id) { <option [ngValue]="c.id">{{ c.codigo }} - {{ c.nombre }}</option> }
+              </select>
+            </label>
+            <label>Nombre <input [value]="cursoConsulta()?.nombre ?? ''" readonly /></label>
+            <label>Créditos <input type="number" [value]="cursoConsulta()?.creditos ?? ''" readonly /></label>
+            <label>Horas por semana <input type="number" [value]="cursoConsulta()?.horas_semana ?? ''" readonly /></label>
+            <label>Créditos aprobados requeridos <input type="number" [value]="cursoConsulta()?.creditos_requeridos ?? ''" readonly /></label>
+            <label>Descripción <textarea rows="2" [value]="cursoConsulta()?.descripcion ?? ''" readonly></textarea></label>
+          </div>
+          <div class="prerreq">
+            <span class="etq">Prerrequisitos</span>
+            <div class="row">
+              @for (p of cursoConsulta()?.prerrequisitos ?? []; track p.id) {
+                <span class="chip solo">{{ p.codigo }} · {{ p.nombre }}</span>
+              } @empty { <span class="muted">{{ cursoConsulta() ? 'Sin prerrequisitos.' : 'Seleccione un curso para ver sus prerrequisitos.' }}</span> }
+            </div>
+          </div>
+        </div>
+
         <div class="card table-wrap">
           <table>
             <thead><tr><th>Ciclo</th><th>Código</th><th>Nombre</th><th>Créditos</th><th>Horas</th><th>Prerrequisitos</th><th></th></tr></thead>
@@ -214,6 +240,8 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
       border-radius: 999px; background: var(--bg); font-size: .85rem; }
     .chip button { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 .3rem; font-size: .8rem; }
     .chip button:hover { color: var(--danger); }
+    .chip.solo { padding-right: .6rem; }
+    input[readonly], textarea[readonly] { background: var(--bg); cursor: default; }
   `,
 })
 export class CatalogoPage implements OnInit {
@@ -277,6 +305,9 @@ export class CatalogoPage implements OnInit {
   });
   protected planDestino: number | null = null;
   protected semestreDestino = 1;
+  /** Curso elegido en el panel de consulta (solo lectura). */
+  protected readonly cursoConsultaId = signal<number | null>(null);
+  protected readonly cursoConsulta = computed(() => this.cursos().find((c) => c.id === this.cursoConsultaId()) ?? null);
 
   protected readonly fCarrera = this.fb.nonNullable.group({
     codigo: ['', Validators.required],
@@ -360,6 +391,7 @@ export class CatalogoPage implements OnInit {
   elegirCarrera(id: number): void {
     this.carreraElegida.set(id);
     this.planDestino = null;
+    this.cursoConsultaId.set(null);
     this.limpiarCurso();
   }
 
