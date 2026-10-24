@@ -87,3 +87,18 @@ def test_limite_de_retiro_dentro_del_periodo(client):
     assert r.status_code == 422 and "límite de retiro" in r.text
     r = client.post("/api/periodos", headers=coord, json={**base, "fecha_limite_retiro": "2027-09-15"})
     assert r.status_code == 201
+
+
+def test_periodo_antiguo_fuera_de_regla_se_sigue_listando(client):
+    # Un periodo guardado antes de la regla del límite de retiro debe verse para poder corregirlo
+    from datetime import date
+
+    from app.db.session import SessionLocal
+    from app.models import Periodo
+
+    with SessionLocal() as db:
+        db.add(Periodo(codigo="2027-X", nombre="Antiguo", fecha_inicio=date(2027, 1, 1),
+                       fecha_fin=date(2027, 6, 1), fecha_limite_retiro=date(2027, 12, 24)))
+        db.commit()
+    r = client.get("/api/periodos", headers=login(client, "coordinador@saiu.edu"))
+    assert r.status_code == 200 and "2027-X" in r.text

@@ -7,7 +7,7 @@ from app.schemas.catalogo import CursoResumen
 from app.schemas.common import ORMModel
 
 
-class PeriodoIn(BaseModel):
+class PeriodoBase(BaseModel):
     codigo: str
     nombre: str
     fecha_inicio: date
@@ -15,6 +15,9 @@ class PeriodoIn(BaseModel):
     fecha_limite_retiro: date | None = None
     estado: EstadoPeriodo = EstadoPeriodo.PLANIFICACION
 
+
+class PeriodoIn(PeriodoBase):
+    # Solo valida lo que se crea o edita: un periodo guardado antes de la regla debe poder listarse para corregirlo
     @model_validator(mode="after")
     def _fechas(self):
         if self.fecha_fin <= self.fecha_inicio:
@@ -24,7 +27,7 @@ class PeriodoIn(BaseModel):
         return self
 
 
-class PeriodoOut(ORMModel, PeriodoIn):
+class PeriodoOut(ORMModel, PeriodoBase):
     id: int
 
 

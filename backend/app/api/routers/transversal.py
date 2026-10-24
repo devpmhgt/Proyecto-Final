@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 from sqlalchemy import func
@@ -70,6 +70,11 @@ def indicadores(db: DB, _: GestionUser, periodo_id: int | None = None):
     )
 
 
+def _a_utc(d: datetime) -> datetime:
+    """Convierte un filtro con zona (hora local del navegador) a UTC sin zona, como se guarda en la base."""
+    return d.astimezone(UTC).replace(tzinfo=None) if d.tzinfo else d
+
+
 @router.get("/auditoria", response_model=list[AuditoriaOut])
 def listar_auditoria(
     db: DB, _: AdminUser, entidad: str | None = None, usuario_id: int | None = None,
@@ -81,9 +86,9 @@ def listar_auditoria(
     if usuario_id:
         q = q.filter(Auditoria.usuario_id == usuario_id)
     if desde:
-        q = q.filter(Auditoria.fecha >= desde)
+        q = q.filter(Auditoria.fecha >= _a_utc(desde))
     if hasta:
-        q = q.filter(Auditoria.fecha <= hasta)
+        q = q.filter(Auditoria.fecha <= _a_utc(hasta))
     return q.order_by(Auditoria.id.desc()).limit(min(limite, 1000)).all()
 
 

@@ -1,8 +1,6 @@
-from datetime import datetime
-
 from pydantic import BaseModel
 
-from app.schemas.common import ORMModel
+from app.schemas.common import FechaHora, ORMModel
 
 
 class AuditoriaOut(ORMModel):
@@ -12,7 +10,7 @@ class AuditoriaOut(ORMModel):
     entidad: str
     entidad_id: int | None
     detalle: str | None
-    fecha: datetime
+    fecha: FechaHora
 
 
 class NotificacionIn(BaseModel):
@@ -26,7 +24,7 @@ class NotificacionOut(ORMModel):
     titulo: str
     mensaje: str
     leida: bool
-    fecha: datetime
+    fecha: FechaHora
 
 
 class Indicadores(BaseModel):

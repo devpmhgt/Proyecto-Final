@@ -1,10 +1,9 @@
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
 from app.models.enums import EstadoInscripcion
-from app.schemas.common import ORMModel
+from app.schemas.common import FechaHora, ORMModel
 from app.schemas.oferta import SeccionOut
 
 
@@ -24,8 +23,8 @@ class EstudianteResumen(ORMModel):
 class InscripcionOut(ORMModel):
     id: int
     estado: EstadoInscripcion
-    fecha_inscripcion: datetime | None
-    fecha_retiro: datetime | None
+    fecha_inscripcion: FechaHora | None
+    fecha_retiro: FechaHora | None
     nota_final: Decimal | None
     estudiante: EstudianteResumen
     seccion: SeccionOut

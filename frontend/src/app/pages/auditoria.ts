@@ -67,8 +67,8 @@ export class AuditoriaPage implements OnInit {
       .auditoria({
         entidad: this.entidad,
         usuario_id: this.usuarioId,
-        desde: this.desde ? `${this.desde}T00:00:00` : null,
-        hasta: this.hasta ? `${this.hasta}T23:59:59` : null,
+        desde: this.desde ? new Date(`${this.desde}T00:00:00`).toISOString() : null,
+        hasta: this.hasta ? new Date(`${this.hasta}T23:59:59.999`).toISOString() : null,
       })
       .subscribe((r) => this.registros.set(r));
   }

@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
     cors_origins: str = "http://localhost:4200"
+    # Zona horaria de la institución: define el "hoy" de las reglas por fecha (p. ej. el límite de retiro)
+    zona_horaria: str = "America/Guatemala"
 
     @field_validator("database_url")
     @classmethod

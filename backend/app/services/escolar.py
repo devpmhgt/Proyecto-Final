@@ -1,11 +1,14 @@
 """Reglas de negocio de gestión escolar: inscripciones, retiros, notas y cierre de actas."""
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+from app.core.config import settings
 
 from app.models import (
     Curso,
@@ -21,6 +24,16 @@ from app.services.planificacion import se_traslapan
 from app.services.transversal import notificar, parametro_num
 
 ACTIVAS = (EstadoInscripcion.INSCRITO, EstadoInscripcion.APROBADO, EstadoInscripcion.REPROBADO)
+
+
+def _ahora_utc() -> datetime:
+    """Hora UTC sin zona, igual que el now() de la base de datos."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _hoy() -> date:
+    """Fecha actual en la zona horaria de la institución (el servidor puede estar en UTC)."""
+    return datetime.now(ZoneInfo(settings.zona_horaria)).date()
 
 
 def _regla(msg: str) -> HTTPException:
@@ -117,7 +130,7 @@ def inscribir(db: Session, estudiante: Estudiante, seccion: Seccion) -> Inscripc
     if existente:  # reinscripción tras un retiro
         existente.estado = EstadoInscripcion.INSCRITO
         existente.fecha_retiro = None
-        existente.fecha_inscripcion = datetime.now()
+        existente.fecha_inscripcion = _ahora_utc()
         inscripcion = existente
     else:
         inscripcion = Inscripcion(estudiante_id=estudiante.id, seccion_id=seccion.id)
@@ -137,7 +150,7 @@ def retirar(db: Session, inscripcion: Inscripcion) -> Inscripcion:
         raise _regla("Solo se pueden retirar inscripciones vigentes")
     if inscripcion.seccion.acta_cerrada:
         raise _regla("El acta de la sección ya está cerrada")
-    if periodo.fecha_limite_retiro and date.today() > periodo.fecha_limite_retiro:
+    if periodo.fecha_limite_retiro and _hoy() > periodo.fecha_limite_retiro:
         raise _regla(f"La fecha límite de retiro ({periodo.fecha_limite_retiro}) ya pasó")
 
     retiros = (
@@ -154,7 +167,7 @@ def retirar(db: Session, inscripcion: Inscripcion) -> Inscripcion:
         raise _regla("Se alcanzó el máximo de retiros permitidos en el periodo")
 
     inscripcion.estado = EstadoInscripcion.RETIRADO
-    inscripcion.fecha_retiro = datetime.now()
+    inscripcion.fecha_retiro = _ahora_utc()
     notificar(
         db,
         inscripcion.estudiante.usuario_id,
