@@ -20,8 +20,9 @@ class InstitucionOut(ORMModel, InstitucionIn):
 class ParametroIn(BaseModel):
     clave: str
     valor: str
-    descripcion: str | None = None
 
 
-class ParametroOut(ORMModel, ParametroIn):
-    id: int
+class ParametroOut(ParametroIn):
+    descripcion: str
+    minimo: int
+    maximo: int

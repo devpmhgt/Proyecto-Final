@@ -60,8 +60,7 @@ export class ApiService {
   institucion = () => this.get<Institucion | null>('/institucion');
   guardarInstitucion = (d: Institucion) => this.put<Institucion>('/institucion', d);
   parametros = () => this.get<Parametro[]>('/institucion/parametros');
-  guardarParametro = (d: Parametro) => this.put<Parametro>('/institucion/parametros', d);
-  eliminarParametro = (id: number) => this.delete<void>(`/institucion/parametros/${id}`);
+  guardarParametro = (d: Pick<Parametro, 'clave' | 'valor'>) => this.put<Parametro>('/institucion/parametros', d);
 
   // 2. Usuarios
   usuarios = () => this.get<Usuario[]>('/usuarios');

@@ -1,9 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
-from app.api.deps import DB, AdminUser, CurrentUser, get_or_404
+from app.api.deps import DB, AdminUser, CurrentUser
 from app.models import Institucion, ParametroAcademico
 from app.schemas.institucion import InstitucionIn, InstitucionOut, ParametroIn, ParametroOut
-from app.services.transversal import auditar
+from app.services.transversal import PARAMETROS_POR_DEFECTO, RANGOS_PARAMETROS, auditar, parametro
 
 router = APIRouter(prefix="/institucion", tags=["1. Configuración institucional"])
 
@@ -29,27 +29,33 @@ def guardar(datos: InstitucionIn, db: DB, admin: AdminUser):
 
 @router.get("/parametros", response_model=list[ParametroOut])
 def listar_parametros(db: DB, _: CurrentUser):
-    return db.query(ParametroAcademico).order_by(ParametroAcademico.clave).all()
+    """Las reglas que aplica el sistema, con su valor guardado o el valor por defecto."""
+    return [
+        ParametroOut(clave=clave, valor=parametro(db, clave), descripcion=desc,
+                     minimo=RANGOS_PARAMETROS[clave][0], maximo=RANGOS_PARAMETROS[clave][1])
+        for clave, (_, desc) in PARAMETROS_POR_DEFECTO.items()
+    ]
 
 
 @router.put("/parametros", response_model=ParametroOut)
 def guardar_parametro(datos: ParametroIn, db: DB, admin: AdminUser):
+    if datos.clave not in PARAMETROS_POR_DEFECTO:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"El parámetro {datos.clave} no existe")
+    minimo, maximo = RANGOS_PARAMETROS[datos.clave]
+    descripcion = PARAMETROS_POR_DEFECTO[datos.clave][1]
+    try:
+        valor = int(datos.valor.strip())
+    except ValueError:
+        valor = None
+    if valor is None or not minimo <= valor <= maximo:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            f"{descripcion}: debe ser un número entero entre {minimo} y {maximo}")
     p = db.query(ParametroAcademico).filter(ParametroAcademico.clave == datos.clave).first()
     if p is None:
         p = ParametroAcademico(clave=datos.clave)
         db.add(p)
-    p.valor = datos.valor
-    if datos.descripcion is not None:
-        p.descripcion = datos.descripcion
+    p.valor, p.descripcion = str(valor), descripcion
     db.flush()
     auditar(db, admin, "guardar", "parametro", p.id, {"clave": p.clave, "valor": p.valor})
     db.commit()
-    return p
-
-
-@router.delete("/parametros/{parametro_id}", status_code=204)
-def eliminar_parametro(parametro_id: int, db: DB, admin: AdminUser):
-    p = get_or_404(db, ParametroAcademico, parametro_id)
-    auditar(db, admin, "eliminar", "parametro", p.id, {"clave": p.clave})
-    db.delete(p)
-    db.commit()
+    return ParametroOut(clave=p.clave, valor=p.valor, descripcion=descripcion, minimo=minimo, maximo=maximo)

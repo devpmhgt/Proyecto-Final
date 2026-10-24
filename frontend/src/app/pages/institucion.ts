@@ -27,32 +27,24 @@ import { Parametro } from '../core/models';
     </form>
 
     <div class="card">
-      <h2>Parámetros académicos y reglas generales</h2>
+      <h2>Reglas académicas</h2>
+      <p class="muted">El sistema aplica estas reglas al inscribir, retirar y cerrar actas. Los cambios rigen desde que se guardan.</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Clave</th><th>Valor</th><th>Descripción</th><th></th></tr></thead>
+          <thead><tr><th>Regla</th><th>Valor</th><th></th></tr></thead>
           <tbody>
-            @for (p of parametros(); track p.id) {
+            @for (p of parametros(); track p.clave) {
               <tr>
-                <td><code>{{ p.clave }}</code></td>
-                <td><input #v [value]="p.valor" style="width:8rem" /></td>
-                <td class="muted">{{ p.descripcion }}</td>
+                <td>{{ p.descripcion }} <span class="muted" style="font-size:.8rem">({{ p.minimo }} a {{ p.maximo }})</span></td>
+                <td><input #v type="number" [min]="p.minimo" [max]="p.maximo" [value]="p.valor" style="width:7rem" [attr.aria-label]="p.descripcion" /></td>
                 <td class="right">
-                  <button class="small" (click)="guardarParametro({ clave: p.clave, valor: v.value })">Guardar</button>
-                  <button class="link" (click)="eliminar(p)">Eliminar</button>
+                  <button class="small" (click)="guardarParametro(p, v.value)">Guardar</button>
                 </td>
               </tr>
             }
           </tbody>
         </table>
       </div>
-      <h3 style="margin-top:1rem">Nuevo parámetro</h3>
-      <form class="row" [formGroup]="nuevo" (ngSubmit)="guardarParametro(nuevo.getRawValue()); nuevo.reset()">
-        <input placeholder="clave" formControlName="clave" />
-        <input placeholder="valor" formControlName="valor" />
-        <input placeholder="descripción" formControlName="descripcion" style="flex:1" />
-        <button type="submit" [disabled]="nuevo.invalid">Agregar</button>
-      </form>
     </div>
   `,
 })
@@ -72,11 +64,6 @@ export class InstitucionPage implements OnInit {
     telefono: [''],
     email: [''],
     sitio_web: [''],
-  });
-  protected readonly nuevo = this.fb.group({
-    clave: ['', Validators.required],
-    valor: ['', Validators.required],
-    descripcion: [''],
   });
 
   ngOnInit(): void {
@@ -100,18 +87,13 @@ export class InstitucionPage implements OnInit {
     });
   }
 
-  guardarParametro(p: Parametro): void {
-    this.api.guardarParametro(p).subscribe({
+  guardarParametro(p: Parametro, valor: string): void {
+    this.api.guardarParametro({ clave: p.clave, valor }).subscribe({
       next: () => {
-        this.aviso(`Parámetro "${p.clave}" guardado.`);
+        this.aviso(`Regla guardada: ${p.descripcion}.`);
         this.cargarParametros();
       },
       error: (e) => this.aviso(mensajeError(e), true),
     });
-  }
-
-  eliminar(p: Parametro): void {
-    if (!confirm(`¿Eliminar el parámetro ${p.clave}? Se usará su valor por defecto.`)) return;
-    this.api.eliminarParametro(p.id!).subscribe(() => this.cargarParametros());
   }
 }

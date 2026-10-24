@@ -26,11 +26,13 @@ export interface Institucion {
   rector?: string | null;
 }
 
+/** Regla académica que aplica el sistema (nota mínima, créditos y retiros por periodo). */
 export interface Parametro {
-  id?: number;
   clave: string;
   valor: string;
-  descripcion?: string | null;
+  descripcion: string;
+  minimo: number;
+  maximo: number;
 }
 
 export interface Carrera {

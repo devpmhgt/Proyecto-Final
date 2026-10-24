@@ -11,6 +11,12 @@ PARAMETROS_POR_DEFECTO = {
     "max_creditos_periodo": ("24", "Máximo de créditos que un estudiante puede inscribir por periodo"),
     "max_retiros_periodo": ("2", "Máximo de retiros de curso permitidos por periodo"),
 }
+# Valores enteros admitidos para cada regla
+RANGOS_PARAMETROS = {
+    "nota_minima_aprobacion": (0, 100),
+    "max_creditos_periodo": (1, 60),
+    "max_retiros_periodo": (0, 10),
+}
 
 
 def auditar(

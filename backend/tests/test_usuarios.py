@@ -48,3 +48,14 @@ def test_quitar_prerrequisitos(client):
     datos = {k: curso[k] for k in ("codigo", "nombre", "creditos", "horas_semana", "descripcion", "creditos_requeridos")}
     r = client.put(f"/api/cursos/{curso['id']}", headers=admin, json={**datos, "prerrequisito_ids": []})
     assert r.status_code == 200 and r.json()["prerrequisitos"] == []
+
+
+def test_reglas_academicas(client):
+    admin = login(client, "admin@saiu.edu")
+    reglas = client.get("/api/institucion/parametros", headers=admin).json()
+    assert [r["clave"] for r in reglas] == ["nota_minima_aprobacion", "max_creditos_periodo", "max_retiros_periodo"]
+    r = client.put("/api/institucion/parametros", headers=admin, json={"clave": "max_creditos_periodo", "valor": "30"})
+    assert r.status_code == 200 and r.json()["valor"] == "30"
+    # Fuera de rango, no numérico o una clave que el sistema no usa
+    for clave, valor in (("nota_minima_aprobacion", "150"), ("max_retiros_periodo", "dos"), ("dias", "3")):
+        assert client.put("/api/institucion/parametros", headers=admin, json={"clave": clave, "valor": valor}).status_code == 422
