@@ -249,9 +249,13 @@ export class CatalogoPage implements OnInit {
   // Cursos por carrera: un curso pertenece a la carrera de los planes que lo incluyen
   protected readonly SIN_PLAN = -1;
   private readonly carreraElegida = signal<number | null>(null);
-  protected readonly carreraCursos = computed(
-    () => this.carreraElegida() ?? this.planes()[0]?.carrera_id ?? this.carreras()[0]?.id ?? null,
-  );
+  /** Carrera elegida o, al entrar, la que tiene más cursos en sus planes. */
+  protected readonly carreraCursos = computed(() => {
+    const elegida = this.carreraElegida();
+    if (elegida !== null) return elegida;
+    const principal = [...this.planes()].sort((a, b) => b.cursos.length - a.cursos.length)[0];
+    return principal?.carrera_id ?? this.carreras()[0]?.id ?? null;
+  });
   protected readonly planesCarrera = computed(() => this.planes().filter((p) => p.carrera_id === this.carreraCursos()));
   /** Ciclo de cada curso dentro de los planes de la carrera elegida (el menor si aparece en varios). */
   private readonly ciclos = computed(() => {
