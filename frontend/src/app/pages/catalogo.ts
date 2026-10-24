@@ -127,8 +127,8 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
             <label>Créditos aprobados requeridos <input type="number" min="0" formControlName="creditos_requeridos" placeholder="ej. 70" /></label>
             <label>Prerrequisitos
               <select [disabled]="!cursoConsulta()?.prerrequisitos?.length">
-                <option>{{ cursoConsulta()?.prerrequisitos?.length ? cursoConsulta()!.prerrequisitos.length + ' prerrequisito(s)' : 'Sin prerrequisitos' }}</option>
-                @for (p of cursoConsulta()?.prerrequisitos ?? []; track p.id) { <option disabled>{{ p.codigo }} - {{ p.nombre }}</option> }
+                @for (p of cursoConsulta()?.prerrequisitos ?? []; track p.id) { <option>{{ p.codigo }} - {{ p.nombre }}</option> }
+                @empty { <option>Sin prerrequisitos</option> }
               </select>
             </label>
           </div>
