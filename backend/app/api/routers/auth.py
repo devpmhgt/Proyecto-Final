@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from app.api.deps import DB, AdminUser, CurrentUser, get_or_404
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models import Usuario
+from app.models import Docente, Estudiante, Rol, Usuario
 from app.schemas.auth import CambioPassword, LoginRequest, TokenResponse, UsuarioCreate, UsuarioOut, UsuarioUpdate
 from app.services.correos import validar_correo_disponible
 from app.services.transversal import auditar
@@ -56,8 +56,25 @@ def listar_usuarios(db: DB, _: AdminUser):
     return db.query(Usuario).order_by(Usuario.nombre).all()
 
 
+# Estudiantes y docentes tienen expediente: su cuenta se crea y se vincula desde Estudiantes o Docentes
+ROLES_DE_PERSONAL = (Rol.ADMIN, Rol.COORDINADOR)
+
+
+def _con_expediente(db, usuario: Usuario) -> bool:
+    return bool(
+        db.query(Estudiante.id).filter(Estudiante.usuario_id == usuario.id).first()
+        or db.query(Docente.id).filter(Docente.usuario_id == usuario.id).first()
+    )
+
+
 @router.post("/usuarios", response_model=UsuarioOut, status_code=201)
 def crear_usuario(datos: UsuarioCreate, db: DB, admin: AdminUser):
+    if datos.rol not in ROLES_DE_PERSONAL:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Las cuentas de {datos.rol.value} se crean desde su expediente en "
+            f"{'Estudiantes' if datos.rol == Rol.ESTUDIANTE else 'Docentes'}",
+        )
     correo = validar_correo_disponible(db, datos.email)
     usuario = Usuario(
         email=correo,
@@ -77,6 +94,16 @@ def crear_usuario(datos: UsuarioCreate, db: DB, admin: AdminUser):
 def actualizar_usuario(usuario_id: int, datos: UsuarioUpdate, db: DB, admin: AdminUser):
     usuario = get_or_404(db, Usuario, usuario_id)
     cambios = datos.model_dump(exclude_unset=True)
+    nuevo_rol = cambios.get("rol")
+    if nuevo_rol is not None and nuevo_rol != usuario.rol:
+        if usuario.rol not in ROLES_DE_PERSONAL or nuevo_rol not in ROLES_DE_PERSONAL or _con_expediente(db, usuario):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "Solo se puede cambiar entre administrador y coordinador. Las cuentas de estudiantes y docentes "
+                "dependen de su expediente: para otro rol, cree una cuenta nueva",
+            )
+    if usuario.id == admin.id and (cambios.get("activo") is False or nuevo_rol not in (None, Rol.ADMIN)):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "No puede desactivarse ni quitarse el rol de administrador a sí mismo")
     if "password" in cambios:
         usuario.hashed_password = hash_password(cambios.pop("password"))
     for campo, valor in cambios.items():

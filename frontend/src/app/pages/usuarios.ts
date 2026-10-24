@@ -1,27 +1,30 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 
 import { ApiService } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { mensajeError } from '../core/auth.interceptor';
 import { Rol, Usuario } from '../core/models';
 
 @Component({
   selector: 'app-usuarios',
-  imports: [ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe, RouterLink],
   template: `
     <h1>Usuarios y roles</h1>
     @if (error()) { <div class="alert error">{{ error() }}</div> }
 
     <form class="card" [formGroup]="form" (ngSubmit)="crear()">
       <h2>Nueva cuenta</h2>
-      <p class="muted">Las cuentas de estudiantes y docentes también pueden crearse desde su expediente.</p>
+      <p class="muted">Aquí se crean cuentas de administración y coordinación. Las de estudiantes y docentes se crean desde su
+        expediente, en <a routerLink="/estudiantes">Estudiantes</a> o <a routerLink="/docentes">Docentes</a>, para que queden vinculadas.</p>
       <div class="form-grid">
         <label>Nombre <input formControlName="nombre" /></label>
         <label>Correo <input type="email" formControlName="email" /></label>
         <label>Rol
           <select formControlName="rol">
-            @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
+            @for (r of rolesPersonal; track r) { <option [value]="r">{{ r }}</option> }
           </select>
         </label>
         <label>Contraseña inicial (mín. 8) <input type="password" formControlName="password" /></label>
@@ -38,14 +41,21 @@ import { Rol, Usuario } from '../core/models';
               <td>{{ u.nombre }}</td>
               <td>{{ u.email }}</td>
               <td>
-                <select (change)="cambiarRol(u, $any($event.target).value)">
-                  @for (r of roles; track r) { <option [value]="r" [selected]="r === u.rol">{{ r }}</option> }
-                </select>
+                @if (esPersonal(u) && u.id !== miId) {
+                  <select (change)="cambiarRol(u, $any($event.target).value)" [attr.aria-label]="'Rol de ' + u.nombre">
+                    @for (r of rolesPersonal; track r) { <option [value]="r" [selected]="r === u.rol">{{ r }}</option> }
+                  </select>
+                } @else {
+                  <span class="badge">{{ u.rol }}</span>
+                  @if (!esPersonal(u)) {
+                    <a class="muted" style="font-size:.8rem;margin-left:.3rem" [routerLink]="u.rol === 'estudiante' ? '/estudiantes' : '/docentes'">ver expediente</a>
+                  }
+                }
               </td>
               <td>{{ u.creado_en | date: 'shortDate' }}</td>
               <td><span class="badge" [class]="u.activo ? 'activo' : 'inactivo'">{{ u.activo ? 'activo' : 'inactivo' }}</span></td>
               <td class="right">
-                <button class="link" (click)="alternar(u)">{{ u.activo ? 'Desactivar' : 'Activar' }}</button>
+                @if (u.id !== miId) { <button class="link" (click)="alternar(u)">{{ u.activo ? 'Desactivar' : 'Activar' }}</button> }
                 <button class="link" (click)="resetear(u)">Restablecer contraseña</button>
               </td>
             </tr>
@@ -57,7 +67,9 @@ import { Rol, Usuario } from '../core/models';
 })
 export class UsuariosPage implements OnInit {
   private readonly api = inject(ApiService);
-  protected readonly roles: Rol[] = ['admin', 'coordinador', 'docente', 'estudiante'];
+  /** Estudiantes y docentes dependen de su expediente: su rol no se cambia aquí. */
+  protected readonly rolesPersonal: Rol[] = ['admin', 'coordinador'];
+  protected readonly miId = inject(AuthService).usuario()?.id;
   protected readonly usuarios = signal<Usuario[]>([]);
   protected readonly error = signal('');
 
@@ -80,7 +92,10 @@ export class UsuariosPage implements OnInit {
     this.error.set('');
     this.api.actualizarUsuario(u.id, cambios).subscribe({
       next: () => this.cargar(),
-      error: (e) => this.error.set(mensajeError(e)),
+      error: (e) => {
+        this.error.set(mensajeError(e));
+        this.cargar(); // devuelve el selector de rol a su valor real
+      },
     });
   }
 
@@ -93,6 +108,10 @@ export class UsuariosPage implements OnInit {
       },
       error: (e) => this.error.set(mensajeError(e)),
     });
+  }
+
+  esPersonal(u: Usuario): boolean {
+    return this.rolesPersonal.includes(u.rol);
   }
 
   cambiarRol(u: Usuario, rol: Rol): void {

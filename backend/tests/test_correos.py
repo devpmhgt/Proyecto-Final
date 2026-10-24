@@ -68,11 +68,22 @@ def test_dar_acceso_a_expediente_existente(client):
     assert client.get("/api/estudiantes/me", headers=h).json()["id"] == est["id"]
 
 
+def _cuenta_suelta(email: str, nombre: str, password: str) -> dict:
+    from app.core.security import hash_password
+    from app.db.session import SessionLocal
+    from app.models import Rol, Usuario
+
+    with SessionLocal() as db:
+        u = Usuario(email=email, nombre=nombre, rol=Rol.ESTUDIANTE, hashed_password=hash_password(password))
+        db.add(u)
+        db.commit()
+        return {"id": u.id}
+
+
 def test_vincular_y_desvincular_cuenta(client):
     admin = login(client, "admin@saiu.edu")
-    # Cuenta suelta de estudiante (creada desde Usuarios) y expediente sin cuenta (mgarcia)
-    cuenta = client.post("/api/usuarios", headers=admin, json={
-        "email": "maria.garcia@saiu.edu", "nombre": "María García", "rol": "estudiante", "password": "maria12345"}).json()
+    # Cuenta suelta de estudiante (de antes de la regla de Usuarios, o liberada al desvincular) y expediente sin cuenta (mgarcia)
+    cuenta = _cuenta_suelta("maria.garcia@saiu.edu", "Cuenta suelta", "maria12345")
     libres = client.get("/api/cuentas-sin-expediente?rol=estudiante", headers=admin).json()
     assert cuenta["id"] in [u["id"] for u in libres]
     est = next(e for e in client.get("/api/estudiantes", headers=admin).json() if e["email"] == "mgarcia@saiu.edu")
@@ -80,6 +91,9 @@ def test_vincular_y_desvincular_cuenta(client):
     r = client.post(f"/api/estudiantes/{est['id']}/vincular", headers=admin, json={"usuario_id": cuenta["id"]})
     assert r.status_code == 200, r.text
     assert r.json()["usuario_id"] == cuenta["id"] and r.json()["email"] == "maria.garcia@saiu.edu"
+    # La cuenta adopta el nombre del expediente
+    nombre = next(u["nombre"] for u in client.get("/api/usuarios", headers=admin).json() if u["id"] == cuenta["id"])
+    assert nombre == f"{est['nombres']} {est['apellidos']}"
     h = {"Authorization": "Bearer " + client.post("/api/auth/login", json={"email": "maria.garcia@saiu.edu", "password": "maria12345"}).json()["access_token"]}
     assert client.get("/api/estudiantes/me", headers=h).json()["id"] == est["id"]
     assert cuenta["id"] not in [u["id"] for u in client.get("/api/cuentas-sin-expediente?rol=estudiante", headers=admin).json()]

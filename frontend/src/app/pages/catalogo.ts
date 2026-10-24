@@ -59,6 +59,16 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
       }
 
       @case ('cursos') {
+        <div class="card row">
+          <label style="flex:1;min-width:16rem">Carrera
+            <select [ngModel]="carreraCursos()" (ngModelChange)="elegirCarrera($event)">
+              @for (c of carreras(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
+              <option [ngValue]="SIN_PLAN">Cursos sin plan de estudios</option>
+            </select>
+          </label>
+          <span class="muted">{{ cursosCarrera().length }} curso(s). Los prerrequisitos se eligen entre los cursos de esta carrera.</span>
+        </div>
+
         <form class="card" [formGroup]="fCurso" (ngSubmit)="guardarCurso()">
           <h2>{{ cursoEdit() ? 'Editar curso' : 'Nuevo curso' }}</h2>
           <div class="form-grid">
@@ -67,15 +77,36 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
             <label>Créditos <input type="number" formControlName="creditos" /></label>
             <label>Horas por semana <input type="number" formControlName="horas_semana" /></label>
             <label>Créditos aprobados requeridos <input type="number" min="0" formControlName="creditos_requeridos" placeholder="ej. 70" /></label>
-            <label>Prerrequisitos (Ctrl+clic para varios)
-              <select multiple formControlName="prerrequisito_ids">
-                @for (c of cursos(); track c.id) {
-                  @if (c.id !== cursoEdit()?.id) { <option [ngValue]="c.id">{{ c.codigo }} · {{ c.nombre }}</option> }
-                }
-              </select>
-            </label>
-            <label>Descripción <textarea formControlName="descripcion" rows="3"></textarea></label>
+            <label>Descripción <textarea formControlName="descripcion" rows="2"></textarea></label>
+            @if (!cursoEdit() && planesCarrera().length) {
+              <label>Agregar al plan
+                <select [(ngModel)]="planDestino" [ngModelOptions]="{ standalone: true }">
+                  <option [ngValue]="null">No agregar</option>
+                  @for (p of planesCarrera(); track p.id) { <option [ngValue]="p.id">{{ p.codigo }} · {{ p.nombre }}</option> }
+                </select>
+              </label>
+              @if (planDestino) {
+                <label>Semestre o ciclo <input type="number" min="1" [(ngModel)]="semestreDestino" [ngModelOptions]="{ standalone: true }" /></label>
+              }
+            }
           </div>
+
+          <div class="prerreq">
+            <span class="etq">Prerrequisitos</span>
+            <div class="row">
+              @for (id of fCurso.controls.prerrequisito_ids.value; track id) {
+                <span class="chip">
+                  {{ cursoPorId(id)?.codigo }} · {{ cursoPorId(id)?.nombre }}
+                  <button type="button" (click)="quitarPrerrequisito(id)" [attr.aria-label]="'Quitar prerrequisito ' + cursoPorId(id)?.codigo">✕</button>
+                </span>
+              } @empty { <span class="muted">Sin prerrequisitos.</span> }
+            </div>
+            <select [ngModel]="null" [ngModelOptions]="{ standalone: true }" (ngModelChange)="agregarPrerrequisito($event)" aria-label="Agregar prerrequisito">
+              <option [ngValue]="null">+ Agregar prerrequisito…</option>
+              @for (c of opcionesPrerrequisito(); track c.id) { <option [ngValue]="c.id">{{ c.codigo }} · {{ c.nombre }}</option> }
+            </select>
+          </div>
+
           <div class="row">
             <button type="submit" [disabled]="fCurso.invalid">Guardar</button>
             @if (cursoEdit()) { <button type="button" class="secondary" (click)="limpiarCurso()">Cancelar</button> }
@@ -83,10 +114,11 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
         </form>
         <div class="card table-wrap">
           <table>
-            <thead><tr><th>Código</th><th>Nombre</th><th>Créditos</th><th>Horas</th><th>Prerrequisitos</th><th></th></tr></thead>
+            <thead><tr><th>Ciclo</th><th>Código</th><th>Nombre</th><th>Créditos</th><th>Horas</th><th>Prerrequisitos</th><th></th></tr></thead>
             <tbody>
-              @for (c of cursos(); track c.id) {
-                <tr>
+              @for (c of cursosCarrera(); track c.id) {
+                <tr [class.selected]="cursoEdit()?.id === c.id">
+                  <td>{{ cicloDe(c.id) ?? '—' }}</td>
                   <td>{{ c.codigo }}</td><td>{{ c.nombre }}</td><td>{{ c.creditos }}</td><td>{{ c.horas_semana }}</td>
                   <td>
                     @for (p of c.prerrequisitos; track p.id) { <span class="badge">{{ p.codigo }}</span>&nbsp; }
@@ -95,66 +127,93 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
                   </td>
                   <td class="right"><button class="link" (click)="editarCurso(c)">Editar</button></td>
                 </tr>
-              }
+              } @empty { <tr><td colspan="7" class="muted">No hay cursos en esta carrera.</td></tr> }
             </tbody>
           </table>
         </div>
       }
 
       @case ('planes') {
-        <div class="grid grid-2">
-          <form class="card" [formGroup]="fPlan" (ngSubmit)="crearPlan()">
-            <h2>Nuevo plan de estudios</h2>
-            <div class="form-grid">
-              <label>Carrera
-                <select formControlName="carrera_id">
-                  @for (c of carreras(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
-                </select>
-              </label>
-              <label>Código <input formControlName="codigo" /></label>
-              <label>Nombre <input formControlName="nombre" /></label>
-              <label>Año <input type="number" formControlName="anio" /></label>
-            </div>
-            <button type="submit" [disabled]="fPlan.invalid">Crear plan</button>
-          </form>
-          <div class="card">
-            <h2>Planes</h2>
-            <table>
-              @for (p of planes(); track p.id) {
-                <tr [class.selected]="planSel()?.id === p.id">
-                  <td>{{ p.codigo }}</td><td>{{ p.nombre }}</td><td>{{ p.anio }}</td>
-                  <td class="right"><button class="link" (click)="planSel.set(p)">Ver cursos</button></td>
-                </tr>
-              }
-            </table>
-          </div>
-        </div>
         @if (planSel(); as p) {
           <div class="card">
-            <h2>{{ p.nombre }} · {{ totalCreditos() }} créditos</h2>
-            <table>
-              <thead><tr><th>Semestre</th><th>Curso</th><th>Créditos</th><th></th></tr></thead>
-              <tbody>
-                @for (pc of cursosPlan(); track pc.id) {
-                  <tr>
-                    <td>{{ pc.semestre }}</td><td>{{ pc.curso.codigo }} · {{ pc.curso.nombre }}</td><td>{{ pc.curso.creditos }}</td>
-                    <td class="right"><button class="link" (click)="quitarCursoPlan(p, pc.curso.id)">Quitar</button></td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-            <div class="row" style="margin-top:.75rem">
-              <select [(ngModel)]="cursoAgregar">
+            <div class="row">
+              <button class="secondary small" (click)="planSel.set(null)">← Todos los planes</button>
+              <h2 style="margin:0">{{ p.codigo }} · {{ p.nombre }}</h2>
+              <span class="spacer"></span>
+              <span class="muted">{{ nombreCarrera(p.carrera_id) }} · {{ p.anio }} · {{ p.cursos.length }} cursos · {{ totalCreditos() }} créditos</span>
+            </div>
+            @for (g of semestresPlan(); track g.semestre) {
+              <h3>Ciclo {{ g.semestre }} <span class="muted" style="font-weight:400">· {{ g.creditos }} créditos</span></h3>
+              <table>
+                <tbody>
+                  @for (pc of g.cursos; track pc.id) {
+                    <tr>
+                      <td style="width:6rem">{{ pc.curso.codigo }}</td><td>{{ pc.curso.nombre }}</td><td style="width:6rem">{{ pc.curso.creditos }} cr.</td>
+                      <td class="right"><button class="link" (click)="quitarCursoPlan(p, pc.curso.id)">Quitar</button></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @empty { <p class="muted">Este plan aún no tiene cursos. Agrégalos abajo o impórtalo desde CSV.</p> }
+            <div class="row" style="margin-top:1rem">
+              <select [(ngModel)]="cursoAgregar" aria-label="Curso para agregar">
                 <option [ngValue]="null">Seleccione un curso…</option>
-                @for (c of cursos(); track c.id) { <option [ngValue]="c.id">{{ c.codigo }} · {{ c.nombre }}</option> }
+                @for (c of cursosFueraDelPlan(); track c.id) { <option [ngValue]="c.id">{{ c.codigo }} · {{ c.nombre }}</option> }
               </select>
-              <input type="number" min="1" [(ngModel)]="semestreAgregar" style="width:6rem" placeholder="Semestre" />
+              <input type="number" min="1" [(ngModel)]="semestreAgregar" style="width:6rem" placeholder="Ciclo" aria-label="Ciclo" />
               <button [disabled]="!cursoAgregar" (click)="agregarCursoPlan(p)">Agregar al plan</button>
+            </div>
+          </div>
+        } @else {
+          <div class="card">
+            <div class="row">
+              <h2 style="margin:0">Planes de estudio</h2>
+              <span class="spacer"></span>
+              <button (click)="nuevoPlan.set(!nuevoPlan())">{{ nuevoPlan() ? 'Cancelar' : '+ Nuevo plan' }}</button>
+            </div>
+            @if (nuevoPlan()) {
+              <form [formGroup]="fPlan" (ngSubmit)="crearPlan()" style="margin-top:1rem">
+                <div class="form-grid">
+                  <label>Carrera
+                    <select formControlName="carrera_id">
+                      @for (c of carreras(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
+                    </select>
+                  </label>
+                  <label>Código <input formControlName="codigo" /></label>
+                  <label>Nombre <input formControlName="nombre" /></label>
+                  <label>Año <input type="number" formControlName="anio" /></label>
+                </div>
+                <button type="submit" [disabled]="fPlan.invalid">Crear plan</button>
+              </form>
+            }
+            <div class="table-wrap" style="margin-top:1rem">
+              <table>
+                <thead><tr><th>Carrera</th><th>Código</th><th>Nombre</th><th>Año</th><th>Cursos</th><th>Créditos</th><th></th></tr></thead>
+                <tbody>
+                  @for (p of planes(); track p.id) {
+                    <tr class="clicable" (click)="planSel.set(p)">
+                      <td>{{ nombreCarrera(p.carrera_id) }}</td><td>{{ p.codigo }}</td><td>{{ p.nombre }}</td><td>{{ p.anio }}</td>
+                      <td>{{ p.cursos.length }}</td><td>{{ creditosDe(p) }}</td>
+                      <td class="right"><button class="link">Ver plan</button></td>
+                    </tr>
+                  } @empty { <tr><td colspan="7" class="muted">No hay planes. Crea uno o impórtalo desde CSV.</td></tr> }
+                </tbody>
+              </table>
             </div>
           </div>
         }
       }
     }
+  `,
+  styles: `
+    tr.clicable { cursor: pointer; }
+    .prerreq { display: grid; gap: .5rem; margin: .5rem 0 1rem; }
+    .prerreq .etq { font-size: .85rem; font-weight: 600; }
+    .prerreq select { max-width: 32rem; }
+    .chip { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .3rem .2rem .6rem; border: 1px solid var(--border);
+      border-radius: 999px; background: var(--bg); font-size: .85rem; }
+    .chip button { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 .3rem; font-size: .8rem; }
+    .chip button:hover { color: var(--danger); }
   `,
 })
 export class CatalogoPage implements OnInit {
@@ -174,8 +233,46 @@ export class CatalogoPage implements OnInit {
     [...(this.planSel()?.cursos ?? [])].sort((a, b) => a.semestre - b.semestre || a.curso.codigo.localeCompare(b.curso.codigo)),
   );
   protected readonly totalCreditos = computed(() => this.cursosPlan().reduce((s, pc) => s + pc.curso.creditos, 0));
+  protected readonly semestresPlan = computed(() => {
+    const grupos = new Map<number, Plan['cursos']>();
+    for (const pc of this.cursosPlan()) grupos.set(pc.semestre, [...(grupos.get(pc.semestre) ?? []), pc]);
+    return [...grupos].map(([semestre, cursos]) => ({ semestre, cursos, creditos: cursos.reduce((s, pc) => s + pc.curso.creditos, 0) }));
+  });
+  protected readonly cursosFueraDelPlan = computed(() => {
+    const dentro = new Set(this.planSel()?.cursos.map((pc) => pc.curso.id));
+    return this.cursos().filter((c) => !dentro.has(c.id));
+  });
   protected cursoAgregar: number | null = null;
   protected semestreAgregar = 1;
+  protected readonly nuevoPlan = signal(false);
+
+  // Cursos por carrera: un curso pertenece a la carrera de los planes que lo incluyen
+  protected readonly SIN_PLAN = -1;
+  private readonly carreraElegida = signal<number | null>(null);
+  protected readonly carreraCursos = computed(
+    () => this.carreraElegida() ?? this.planes()[0]?.carrera_id ?? this.carreras()[0]?.id ?? null,
+  );
+  protected readonly planesCarrera = computed(() => this.planes().filter((p) => p.carrera_id === this.carreraCursos()));
+  /** Ciclo de cada curso dentro de los planes de la carrera elegida (el menor si aparece en varios). */
+  private readonly ciclos = computed(() => {
+    const ciclos = new Map<number, number>();
+    for (const pc of this.planesCarrera().flatMap((p) => p.cursos)) {
+      ciclos.set(pc.curso.id, Math.min(pc.semestre, ciclos.get(pc.curso.id) ?? Infinity));
+    }
+    return ciclos;
+  });
+  protected readonly cursosCarrera = computed(() => {
+    if (this.carreraCursos() === this.SIN_PLAN) {
+      const enPlanes = new Set(this.planes().flatMap((p) => p.cursos.map((pc) => pc.curso.id)));
+      return this.cursos().filter((c) => !enPlanes.has(c.id));
+    }
+    const ciclos = this.ciclos();
+    return this.cursos()
+      .filter((c) => ciclos.has(c.id))
+      .sort((a, b) => ciclos.get(a.id)! - ciclos.get(b.id)! || a.codigo.localeCompare(b.codigo));
+  });
+  protected planDestino: number | null = null;
+  protected semestreDestino = 1;
 
   protected readonly fCarrera = this.fb.nonNullable.group({
     codigo: ['', Validators.required],
@@ -256,21 +353,64 @@ export class CatalogoPage implements OnInit {
     this.fCurso.reset();
   }
 
+  elegirCarrera(id: number): void {
+    this.carreraElegida.set(id);
+    this.planDestino = null;
+    this.limpiarCurso();
+  }
+
+  cicloDe(cursoId: number): number | undefined {
+    return this.ciclos().get(cursoId);
+  }
+
+  cursoPorId(id: number): Curso | undefined {
+    return this.cursos().find((c) => c.id === id);
+  }
+
+  /** Cursos que se pueden agregar como prerrequisito: los de la carrera, sin el propio curso ni los ya elegidos. */
+  opcionesPrerrequisito(): Curso[] {
+    const elegidos = new Set(this.fCurso.controls.prerrequisito_ids.value);
+    const base = this.carreraCursos() === this.SIN_PLAN ? this.cursos() : this.cursosCarrera();
+    return base.filter((c) => c.id !== this.cursoEdit()?.id && !elegidos.has(c.id));
+  }
+
+  agregarPrerrequisito(id: number | null): void {
+    if (id === null) return;
+    const control = this.fCurso.controls.prerrequisito_ids;
+    control.setValue([...control.value, id]);
+  }
+
+  quitarPrerrequisito(id: number): void {
+    const control = this.fCurso.controls.prerrequisito_ids;
+    control.setValue(control.value.filter((p) => p !== id));
+  }
+
   guardarCurso(): void {
     const datos = this.fCurso.getRawValue();
     const actual = this.cursoEdit();
+    const plan = actual ? null : this.planDestino;
     (actual ? this.api.actualizarCurso(actual.id, datos) : this.api.crearCurso(datos)).subscribe(
-      this.manejar(() => {
+      this.manejar((curso: Curso) => {
         this.limpiarCurso();
         this.api.cursos().subscribe((c) => this.cursos.set(c));
+        if (plan) this.api.agregarCursoPlan(plan, curso.id, this.semestreDestino).subscribe(this.manejar(() => this.cargarPlanes()));
       }),
     );
+  }
+
+  nombreCarrera(id: number): string {
+    return this.carreras().find((c) => c.id === id)?.nombre ?? '';
+  }
+
+  creditosDe(p: Plan): number {
+    return p.cursos.reduce((s, pc) => s + pc.curso.creditos, 0);
   }
 
   crearPlan(): void {
     this.api.crearPlan(this.fPlan.getRawValue() as Partial<Plan>).subscribe(
       this.manejar((p: Plan) => {
         this.fPlan.reset({ anio: new Date().getFullYear() });
+        this.nuevoPlan.set(false);
         this.cargarPlanes(p.id);
       }),
     );

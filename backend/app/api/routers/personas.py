@@ -46,6 +46,12 @@ def _cambiar_correo(db: Session, cambios: dict, registro: Estudiante | Docente, 
         registro.usuario.email = cambios["email"]
 
 
+def _sincronizar_nombre(registro: Estudiante | Docente) -> None:
+    """La cuenta vinculada muestra el mismo nombre que el expediente."""
+    if registro.usuario:
+        registro.usuario.nombre = f"{registro.nombres} {registro.apellidos}".strip()
+
+
 def _gestionar_acceso(db: Session, registro: Estudiante | Docente, password: str | None, rol: Rol, **excluir) -> bool:
     """Crea la cuenta vinculada si el expediente no tiene, o restablece su contraseña. Devuelve True si cambió algo."""
     if not password:
@@ -140,6 +146,7 @@ def actualizar_estudiante(estudiante_id: int, datos: EstudianteUpdate, db: DB, g
     _cambiar_correo(db, cambios, est, estudiante_id=est.id)
     for campo, valor in cambios.items():
         setattr(est, campo, valor)
+    _sincronizar_nombre(est)
     if _gestionar_acceso(db, est, password, Rol.ESTUDIANTE, estudiante_id=est.id):
         cambios["acceso"] = "contraseña asignada"
     if est.usuario and "estado" in cambios:
@@ -200,6 +207,7 @@ def actualizar_docente(docente_id: int, datos: DocenteUpdate, db: DB, gestor: Ge
     _cambiar_correo(db, cambios, doc, docente_id=doc.id)
     for campo, valor in cambios.items():
         setattr(doc, campo, valor)
+    _sincronizar_nombre(doc)
     if _gestionar_acceso(db, doc, password, Rol.DOCENTE, docente_id=doc.id):
         cambios["acceso"] = "contraseña asignada"
     auditar(db, gestor, "actualizar", "docente", doc.id, cambios)
@@ -239,6 +247,7 @@ def _vincular(db: Session, registro: Estudiante | Docente, usuario_id: int, rol:
     # El expediente adopta el correo de la cuenta, para que ambos coincidan
     registro.email = validar_correo_disponible(db, usuario.email, usuario_id=usuario.id, **excluir)
     registro.usuario_id = usuario.id
+    usuario.nombre = f"{registro.nombres} {registro.apellidos}".strip()
     return usuario
 
 
