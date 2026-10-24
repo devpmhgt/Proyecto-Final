@@ -125,22 +125,12 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
             <label>Nombre <input formControlName="nombre" /></label>
             <label>Créditos <input type="number" [value]="cursoConsulta()?.creditos ?? ''" readonly /></label>
             <label>Créditos aprobados requeridos <input type="number" min="0" formControlName="creditos_requeridos" placeholder="ej. 70" /></label>
-          </div>
-          <div class="prerreq">
-            <span class="etq">Prerrequisitos</span>
-            <div class="row">
-              @for (id of fConsulta.controls.prerrequisito_ids.value; track id) {
-                <span class="chip">
-                  {{ cursoPorId(id)?.codigo }} - {{ cursoPorId(id)?.nombre }}
-                  <button type="button" (click)="quitarPrereqConsulta(id)" [attr.aria-label]="'Quitar prerrequisito ' + cursoPorId(id)?.codigo">✕</button>
-                </span>
-              } @empty { <span class="muted">Sin prerrequisitos.</span> }
-            </div>
-            <select [ngModel]="null" [ngModelOptions]="{ standalone: true }" (ngModelChange)="agregarPrereqConsulta($event)"
-                    [disabled]="!cursoConsulta()" aria-label="Agregar prerrequisito al curso consultado">
-              <option [ngValue]="null">+ Agregar prerrequisito…</option>
-              @for (c of opcionesPrereqConsulta(); track c.id) { <option [ngValue]="c.id">{{ c.codigo }} - {{ c.nombre }}</option> }
-            </select>
+            <label>Prerrequisitos
+              <select [disabled]="!cursoConsulta()?.prerrequisitos?.length">
+                <option>{{ cursoConsulta()?.prerrequisitos?.length ? cursoConsulta()!.prerrequisitos.length + ' prerrequisito(s)' : 'Sin prerrequisitos' }}</option>
+                @for (p of cursoConsulta()?.prerrequisitos ?? []; track p.id) { <option disabled>{{ p.codigo }} - {{ p.nombre }}</option> }
+              </select>
+            </label>
           </div>
           <div class="row">
             <button type="submit" [disabled]="!cursoConsulta() || fConsulta.invalid || fConsulta.pristine">Guardar</button>
@@ -335,7 +325,6 @@ export class CatalogoPage implements OnInit {
   protected readonly fConsulta = this.fb.nonNullable.group({
     nombre: ['', Validators.required],
     creditos_requeridos: [null as number | null, Validators.min(0)],
-    prerrequisito_ids: [[] as number[]],
   });
   protected readonly fPlan = this.fb.group({
     carrera_id: [null as number | null, Validators.required],
@@ -453,35 +442,15 @@ export class CatalogoPage implements OnInit {
     this.fConsulta.reset({
       nombre: c?.nombre ?? '',
       creditos_requeridos: c?.creditos_requeridos ?? null,
-      prerrequisito_ids: c?.prerrequisitos.map((p) => p.id) ?? [],
     });
-  }
-
-  /** Cursos de la carrera que se pueden agregar como prerrequisito del curso consultado. */
-  opcionesPrereqConsulta(): Curso[] {
-    const elegidos = new Set(this.fConsulta.controls.prerrequisito_ids.value);
-    const base = this.carreraCursos() === this.SIN_PLAN ? this.cursos() : this.cursosCarrera();
-    return base.filter((c) => c.id !== this.cursoConsultaId() && !elegidos.has(c.id));
-  }
-
-  agregarPrereqConsulta(id: number | null): void {
-    if (id === null) return;
-    const control = this.fConsulta.controls.prerrequisito_ids;
-    control.setValue([...control.value, id]);
-    control.markAsDirty();
-  }
-
-  quitarPrereqConsulta(id: number): void {
-    const control = this.fConsulta.controls.prerrequisito_ids;
-    control.setValue(control.value.filter((p) => p !== id));
-    control.markAsDirty();
   }
 
   guardarConsulta(): void {
     const c = this.cursoConsulta();
     if (!c) return;
+    // El PUT espera el curso completo: se conservan los prerrequisitos que ya tiene
     const { prerrequisitos, ...resto } = c;
-    const datos = { ...resto, ...this.fConsulta.getRawValue() };
+    const datos = { ...resto, prerrequisito_ids: prerrequisitos.map((p) => p.id), ...this.fConsulta.getRawValue() };
     this.api.actualizarCurso(c.id, datos).subscribe(
       this.manejar(() =>
         this.api.cursos().subscribe((cs) => {
