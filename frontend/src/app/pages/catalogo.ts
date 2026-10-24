@@ -113,30 +113,39 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
           </div>
         </form>
 
-        <div class="card">
+        <form class="card" [formGroup]="fConsulta" (ngSubmit)="guardarConsulta()">
           <h2>Consultar curso</h2>
           <div class="form-grid">
             <label>Código
-              <select [ngModel]="cursoConsultaId()" (ngModelChange)="cursoConsultaId.set($event)">
+              <select [ngModel]="cursoConsultaId()" [ngModelOptions]="{ standalone: true }" (ngModelChange)="elegirConsulta($event)">
                 <option [ngValue]="null">Seleccione un código…</option>
                 @for (c of cursosCarrera(); track c.id) { <option [ngValue]="c.id">{{ c.codigo }} - {{ c.nombre }}</option> }
               </select>
             </label>
-            <label>Nombre <input [value]="cursoConsulta()?.nombre ?? ''" readonly /></label>
+            <label>Nombre <input formControlName="nombre" /></label>
             <label>Créditos <input type="number" [value]="cursoConsulta()?.creditos ?? ''" readonly /></label>
-            <label>Horas por semana <input type="number" [value]="cursoConsulta()?.horas_semana ?? ''" readonly /></label>
-            <label>Créditos aprobados requeridos <input type="number" [value]="cursoConsulta()?.creditos_requeridos ?? ''" readonly /></label>
-            <label>Descripción <textarea rows="2" [value]="cursoConsulta()?.descripcion ?? ''" readonly></textarea></label>
+            <label>Créditos aprobados requeridos <input type="number" min="0" formControlName="creditos_requeridos" placeholder="ej. 70" /></label>
           </div>
           <div class="prerreq">
             <span class="etq">Prerrequisitos</span>
             <div class="row">
-              @for (p of cursoConsulta()?.prerrequisitos ?? []; track p.id) {
-                <span class="chip solo">{{ p.codigo }} · {{ p.nombre }}</span>
-              } @empty { <span class="muted">{{ cursoConsulta() ? 'Sin prerrequisitos.' : 'Seleccione un curso para ver sus prerrequisitos.' }}</span> }
+              @for (id of fConsulta.controls.prerrequisito_ids.value; track id) {
+                <span class="chip">
+                  {{ cursoPorId(id)?.codigo }} - {{ cursoPorId(id)?.nombre }}
+                  <button type="button" (click)="quitarPrereqConsulta(id)" [attr.aria-label]="'Quitar prerrequisito ' + cursoPorId(id)?.codigo">✕</button>
+                </span>
+              } @empty { <span class="muted">Sin prerrequisitos.</span> }
             </div>
+            <select [ngModel]="null" [ngModelOptions]="{ standalone: true }" (ngModelChange)="agregarPrereqConsulta($event)"
+                    [disabled]="!cursoConsulta()" aria-label="Agregar prerrequisito al curso consultado">
+              <option [ngValue]="null">+ Agregar prerrequisito…</option>
+              @for (c of opcionesPrereqConsulta(); track c.id) { <option [ngValue]="c.id">{{ c.codigo }} - {{ c.nombre }}</option> }
+            </select>
           </div>
-        </div>
+          <div class="row">
+            <button type="submit" [disabled]="!cursoConsulta() || fConsulta.invalid || fConsulta.pristine">Guardar</button>
+          </div>
+        </form>
 
         <div class="card table-wrap">
           <table>
@@ -240,8 +249,7 @@ type Pestana = 'carreras' | 'cursos' | 'planes' | 'importar';
       border-radius: 999px; background: var(--bg); font-size: .85rem; }
     .chip button { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 .3rem; font-size: .8rem; }
     .chip button:hover { color: var(--danger); }
-    .chip.solo { padding-right: .6rem; }
-    input[readonly], textarea[readonly] { background: var(--bg); cursor: default; }
+    input[readonly] { background: var(--bg); cursor: default; }
   `,
 })
 export class CatalogoPage implements OnInit {
@@ -305,7 +313,7 @@ export class CatalogoPage implements OnInit {
   });
   protected planDestino: number | null = null;
   protected semestreDestino = 1;
-  /** Curso elegido en el panel de consulta (solo lectura). */
+  /** Curso elegido en el panel de consulta. */
   protected readonly cursoConsultaId = signal<number | null>(null);
   protected readonly cursoConsulta = computed(() => this.cursos().find((c) => c.id === this.cursoConsultaId()) ?? null);
 
@@ -321,6 +329,11 @@ export class CatalogoPage implements OnInit {
     creditos: [4, [Validators.required, Validators.min(0)]],
     horas_semana: [4, Validators.min(0)],
     descripcion: [''],
+    creditos_requeridos: [null as number | null, Validators.min(0)],
+    prerrequisito_ids: [[] as number[]],
+  });
+  protected readonly fConsulta = this.fb.nonNullable.group({
+    nombre: ['', Validators.required],
     creditos_requeridos: [null as number | null, Validators.min(0)],
     prerrequisito_ids: [[] as number[]],
   });
@@ -391,7 +404,7 @@ export class CatalogoPage implements OnInit {
   elegirCarrera(id: number): void {
     this.carreraElegida.set(id);
     this.planDestino = null;
-    this.cursoConsultaId.set(null);
+    this.elegirConsulta(null);
     this.limpiarCurso();
   }
 
@@ -431,6 +444,51 @@ export class CatalogoPage implements OnInit {
         this.api.cursos().subscribe((c) => this.cursos.set(c));
         if (plan) this.api.agregarCursoPlan(plan, curso.id, this.semestreDestino).subscribe(this.manejar(() => this.cargarPlanes()));
       }),
+    );
+  }
+
+  elegirConsulta(id: number | null): void {
+    this.cursoConsultaId.set(id);
+    const c = this.cursoConsulta();
+    this.fConsulta.reset({
+      nombre: c?.nombre ?? '',
+      creditos_requeridos: c?.creditos_requeridos ?? null,
+      prerrequisito_ids: c?.prerrequisitos.map((p) => p.id) ?? [],
+    });
+  }
+
+  /** Cursos de la carrera que se pueden agregar como prerrequisito del curso consultado. */
+  opcionesPrereqConsulta(): Curso[] {
+    const elegidos = new Set(this.fConsulta.controls.prerrequisito_ids.value);
+    const base = this.carreraCursos() === this.SIN_PLAN ? this.cursos() : this.cursosCarrera();
+    return base.filter((c) => c.id !== this.cursoConsultaId() && !elegidos.has(c.id));
+  }
+
+  agregarPrereqConsulta(id: number | null): void {
+    if (id === null) return;
+    const control = this.fConsulta.controls.prerrequisito_ids;
+    control.setValue([...control.value, id]);
+    control.markAsDirty();
+  }
+
+  quitarPrereqConsulta(id: number): void {
+    const control = this.fConsulta.controls.prerrequisito_ids;
+    control.setValue(control.value.filter((p) => p !== id));
+    control.markAsDirty();
+  }
+
+  guardarConsulta(): void {
+    const c = this.cursoConsulta();
+    if (!c) return;
+    const { prerrequisitos, ...resto } = c;
+    const datos = { ...resto, ...this.fConsulta.getRawValue() };
+    this.api.actualizarCurso(c.id, datos).subscribe(
+      this.manejar(() =>
+        this.api.cursos().subscribe((cs) => {
+          this.cursos.set(cs);
+          this.elegirConsulta(c.id);
+        }),
+      ),
     );
   }
 
